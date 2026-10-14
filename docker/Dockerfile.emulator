@@ -1,0 +1,12 @@
+# Headless Android 14 emulator for smoke-testing the APK. The google_apis x86_64 image
+# translates arm64 binaries, which is how the arm64-only mosh-client runs on it.
+FROM pocketshell-toolchain
+# The emulator links X11/GL libraries even when run with -no-window.
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      libx11-6 libxext6 libxrender1 libxcomposite1 libxcursor1 libxi6 libxtst6 libxdamage1 libxrandr2 \
+      libxkbfile1 libxfixes3 libnss3 libgl1 libegl1 libpulse0 libdbus-1-3 libasound2 libxcb1 libxcb-cursor0 \
+      libxkbcommon0 libxkbcommon-x11-0 \
+    && rm -rf /var/lib/apt/lists/*
+RUN sdkmanager "emulator" "system-images;android-34;google_apis;x86_64" >/dev/null \
+    && echo no | avdmanager create avd -n test -k "system-images;android-34;google_apis;x86_64" -d pixel_6 >/dev/null
+ENV PATH=$PATH:/opt/android-sdk/emulator
