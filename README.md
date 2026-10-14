@@ -36,6 +36,10 @@ mosh-server older than 1.4.0 (Ubuntu 20.04 ships 1.3.2) mangles 24-bit color, wh
 Claude Code under herdr or tmux. `native/build-mosh-server-host.sh` builds a static 1.4.0 server you can put in
 your home directory without root; see `native/README.md`.
 
+## Publishing
+
+See [PLAY.md](PLAY.md) for the Google Play checklist and [PRIVACY.md](PRIVACY.md) for the privacy policy.
+
 ## Building
 
 Everything builds in Docker. Nothing Android-related is installed on the host.

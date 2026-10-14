@@ -26,6 +26,9 @@ import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.PopupMenu
 import android.widget.TextView
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import com.termux.terminal.KeyHandler
 import com.termux.terminal.TerminalSession
 import com.termux.terminal.TerminalSessionClient
@@ -56,9 +59,9 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
             finish()
             return
         }
-        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
-        window.statusBarColor = BACKGROUND
-        window.navigationBarColor = BAR
+        // Draw edge to edge (Android 15+ enforces it for apps targeting 35+) and pad for the system bars and
+        // the keyboard ourselves, so the terminal shrinks above the keyboard on every Android version.
+        WindowCompat.setDecorFitsSystemWindows(window, false)
 
         fontSize = store.fontSize.takeIf { it > 0 } ?: sp(13f)
 
@@ -77,7 +80,14 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
         setContentView(LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(BACKGROUND)
-            fitsSystemWindows = true
+            ViewCompat.setOnApplyWindowInsetsListener(this) { view, insets ->
+                val bars = insets.getInsets(
+                    WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout() or
+                        WindowInsetsCompat.Type.ime()
+                )
+                view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+                WindowInsetsCompat.CONSUMED
+            }
             addView(buildHeader(), LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
             addView(terminalView, LinearLayout.LayoutParams(MATCH_PARENT, 0, 1f))
             addView(endedBar, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))

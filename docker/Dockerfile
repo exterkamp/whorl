@@ -1,4 +1,4 @@
-# Android build toolchain for pocketshell: JDK 17, SDK 34, NDK r26d, Gradle 8.7,
+# Android build toolchain for pocketshell: JDK 17, SDK 36, NDK r26d, Gradle 8.13,
 # plus what cross-compiling mosh-client needs. Nothing gets installed on the host.
 FROM eclipse-temurin:17-jdk-jammy
 
@@ -17,10 +17,10 @@ RUN mkdir -p $ANDROID_HOME/cmdline-tools \
     && mv $ANDROID_HOME/cmdline-tools/cmdline-tools $ANDROID_HOME/cmdline-tools/latest \
     && rm /tmp/clt.zip \
     && yes | sdkmanager --licenses >/dev/null \
-    && sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools" "ndk;26.3.11579264" >/dev/null
+    && sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools" "ndk;26.3.11579264" >/dev/null
 
-RUN curl -fsSL -o /tmp/gradle.zip https://services.gradle.org/distributions/gradle-8.7-bin.zip \
-    && unzip -q /tmp/gradle.zip -d /opt && mv /opt/gradle-8.7 /opt/gradle && rm /tmp/gradle.zip
+RUN curl -fsSL -o /tmp/gradle.zip https://services.gradle.org/distributions/gradle-8.13-bin.zip \
+    && unzip -q /tmp/gradle.zip -d /opt && mv /opt/gradle-8.13 /opt/gradle && rm /tmp/gradle.zip
 
 # Host protoc matching the protobuf version mosh-client is built against.
 RUN curl -fsSL -o /tmp/protoc.zip https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-linux-x86_64.zip \

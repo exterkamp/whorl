@@ -7,6 +7,8 @@ import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -39,6 +41,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -102,6 +105,7 @@ private sealed interface Screen {
     data object Hosts : Screen
     data class Edit(val profile: Profile, val isNew: Boolean) : Screen
     data object DeviceKey : Screen
+    data object About : Screen
 }
 
 class MainActivity : ComponentActivity() {
@@ -111,8 +115,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = 0xFF0E1116.toInt()
-        window.navigationBarColor = 0xFF0E1116.toInt()
+        // Scaffold pads for the system bars, and the editors use imePadding, so drawing edge to edge is safe.
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+        )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             // Only for the "connected" notification; sessions work without it.
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 0)
@@ -145,6 +152,7 @@ private fun App(store: Store, resumes: Int, connect: (Profile) -> Unit) {
             onEdit = { screen = Screen.Edit(it, isNew = false) },
             onAdd = { screen = Screen.Edit(Profile(), isNew = true) },
             onDeviceKey = { screen = Screen.DeviceKey },
+            onAbout = { screen = Screen.About },
         )
         is Screen.Edit -> {
             BackHandler { screen = Screen.Hosts }
@@ -168,6 +176,10 @@ private fun App(store: Store, resumes: Int, connect: (Profile) -> Unit) {
             BackHandler { screen = Screen.Hosts }
             DeviceKey(store, onBack = { screen = Screen.Hosts })
         }
+        Screen.About -> {
+            BackHandler { screen = Screen.Hosts }
+            About(onBack = { screen = Screen.Hosts })
+        }
     }
 }
 
@@ -180,6 +192,7 @@ private fun HostList(
     onEdit: (Profile) -> Unit,
     onAdd: () -> Unit,
     onDeviceKey: () -> Unit,
+    onAbout: () -> Unit,
 ) {
     Scaffold(
         topBar = {
@@ -187,6 +200,7 @@ private fun HostList(
                 title = { Text("Hosts", fontWeight = FontWeight.SemiBold) },
                 actions = {
                     IconButton(onClick = onDeviceKey) { Icon(Icons.Default.Lock, "Device key") }
+                    IconButton(onClick = onAbout) { Icon(Icons.Default.Info, "About") }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
             )
@@ -541,6 +555,60 @@ private fun DeviceKey(store: Store, onBack: () -> Unit) {
         )
     }
 }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun About(onBack: () -> Unit) {
+    val context = LocalContext.current
+    var showLicenses by remember { mutableStateOf(false) }
+    val version = remember {
+        context.packageManager.getPackageInfo(context.packageName, 0).versionName
+    }
+    fun open(url: String) = context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(if (showLicenses) "Open source licenses" else "About") },
+                navigationIcon = {
+                    IconButton(onClick = { if (showLicenses) showLicenses = false else onBack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+            )
+        },
+    ) { padding ->
+        if (showLicenses) {
+            BackHandler { showLicenses = false }
+            val text = remember { context.assets.open("licenses.txt").bufferedReader().use { it.readText() } }
+            Text(
+                text,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 11.sp,
+                modifier = Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp),
+            )
+            return@Scaffold
+        }
+        Column(
+            Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Text("PocketShell $version", style = MaterialTheme.typography.titleLarge)
+            Text(
+                "A plain SSH and mosh client. No accounts, no analytics, no ads. PocketShell only talks to the " +
+                    "hosts you add, and your hosts, passwords and keys stay encrypted on this device.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OutlinedButton(onClick = { open(PRIVACY_URL) }) { Text("Privacy policy") }
+            OutlinedButton(onClick = { open(SOURCE_URL) }) { Text("Source code") }
+            OutlinedButton(onClick = { showLicenses = true }) { Text("Open source licenses") }
+        }
+    }
+}
+
+private const val SOURCE_URL = "https://github.com/exterkamp/pocketshell"
+private const val PRIVACY_URL = "https://github.com/exterkamp/pocketshell/blob/main/PRIVACY.md"
 
 @Composable
 private fun Field(
