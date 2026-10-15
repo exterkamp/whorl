@@ -55,6 +55,9 @@ class ActiveSession(
     /** The session that took over when this one was reconnected. Main thread only. */
     var replacedBy: ActiveSession? = null
 
+    /** herdr's agents on this machine, if it runs herdr; started once the session is up. */
+    var herdr: HerdrLink? = null
+
     /** The screen currently showing this session, if any. */
     @Volatile var ui: PromptUi? = null
     var listener: TerminalSessionClient? = null
@@ -101,6 +104,8 @@ class ActiveSession(
 
     override fun connected(route: Route) {
         this.route = route
+        herdr?.start()
+        main.post { Sessions.changed() }
         main.post { ui?.refresh() }
     }
 }
@@ -112,6 +117,11 @@ object Sessions {
     /** Bumped whenever a session starts, ends or is removed, so Compose screens reading it stay current. */
     var version by mutableIntStateOf(0)
         private set
+
+    /** Something shown about a session changed (its herdr agents, say). Main thread only. */
+    fun changed() {
+        version++
+    }
 
     fun get(id: String): ActiveSession? = sessions[id]
 
@@ -157,6 +167,7 @@ object Sessions {
         old.replacedBy = next
         old.attach(null)
         old.listener = null
+        old.herdr?.stop()
         old.terminal.finishIfRunning()
         next.terminal.updateSize(size.first, size.second)
         ui?.replaced(next)
@@ -172,6 +183,7 @@ object Sessions {
         }
         active.transport = transport
         active.terminal = TerminalSession(transport, 5000, Forwarder(app, active))
+        active.herdr = HerdrLink(app, active)
         active.terminal.mSessionName = profile.id
         sessions[profile.id] = active
         Store.get(app).let { it.openSessions = it.openSessions + profile.id }
@@ -182,6 +194,7 @@ object Sessions {
 
     /** The user ended this session: stop it and don't bring it back on the next launch. */
     fun remove(context: Context, session: ActiveSession) {
+        session.herdr?.stop()
         session.terminal.finishIfRunning()
         // Already reconnected: the new session owns the machine's slot, its mosh-server and its place in the list.
         if (session.replacedBy != null) return
@@ -210,6 +223,7 @@ object Sessions {
         override fun onTitleChanged(s: TerminalSession) { active.listener?.onTitleChanged(s) }
         override fun onSessionFinished(s: TerminalSession) {
             active.finished = true
+            active.herdr?.stop()
             // Replaced by a reconnect: the new session carries on, and nothing about this one matters any more.
             if (active.replacedBy != null) return
             if (s.exitStatus == 0) {
@@ -229,11 +243,14 @@ object Sessions {
         override fun onBell(s: TerminalSession) {
             val listener = active.listener
             if (listener != null) listener.onBell(s)
-            else if (active.replacedBy == null) Alerts.post(app, active, title = null, body = null)
+            else if (active.replacedBy == null && !herdrAlerts()) Alerts.post(app, active, title = null, body = null)
         }
         override fun onNotification(s: TerminalSession, title: String?, body: String?) {
-            if (active.listener == null && active.replacedBy == null) Alerts.post(app, active, title, body)
+            if (active.listener == null && active.replacedBy == null && !herdrAlerts()) Alerts.post(app, active, title, body)
         }
+
+        /** herdr's agent alerts say which agent and why; a bell alongside them would be a second, vaguer one. */
+        private fun herdrAlerts() = active.herdr?.available == true
         override fun onColorsChanged(s: TerminalSession) { active.listener?.onColorsChanged(s) }
         override fun onTerminalCursorStateChange(state: Boolean) { active.listener?.onTerminalCursorStateChange(state) }
         override fun getTerminalCursorStyle(): Int? = null

@@ -22,8 +22,8 @@ android {
         applicationId = "codes.exterkamp.whorl"
         minSdk = 26
         targetSdk = 36
-        versionCode = 6
-        versionName = "0.4.2"
+        versionCode = 7
+        versionName = "0.5.0"
         // The commit this was built from, set by build.sh; "+" means uncommitted changes.
         buildConfigField("String", "GIT_COMMIT", "\"${System.getenv("GIT_COMMIT") ?: "dev"}\"")
         ndk {
@@ -86,4 +86,6 @@ dependencies {
     implementation("androidx.compose.ui:ui")
 
     testImplementation("junit:junit:4.13.2")
+    // Android's org.json is a stub on the JVM; tests that parse JSON need the real one.
+    testImplementation("org.json:json:20240303")
 }

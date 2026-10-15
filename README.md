@@ -26,6 +26,12 @@ extra-keys row. No accounts, no sign-in, no paid tier, and no network traffic ex
 - **Alerts:** when a program in a session you aren't looking at rings the bell, or asks for a notification
   (OSC 9, 777 or 99), you get an Android notification that opens that session. Over mosh only the bell gets
   through, so the notification shows the terminal's title.
+- **herdr:** on a machine running [herdr](https://herdr.dev), Whorl watches its coding agents over a second SSH
+  connection (to herdr's socket, so mosh sessions get it too). An agent that needs you or finishes sends a
+  notification naming it, and tapping it opens the session with herdr switched to that agent. The session card
+  and the terminal header show "3 agents · 1 needs you", the header's session menu lists the agents to switch
+  between, and a **herdr** key in the key row offers herdr's commands (workspaces, tabs, panes, detach)
+  without chording Ctrl+B. It needs the device key or a saved password, since it connects without asking.
 - **Run on connect:** a per-machine command typed into the shell once connected, e.g. `herdr` or
   `tmux new -A -s main`. Exiting it leaves you at the shell.
 - **Reattach:** if the app is killed (an update, or Android reclaiming memory), opening it again reconnects

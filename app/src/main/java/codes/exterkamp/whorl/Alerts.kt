@@ -62,6 +62,53 @@ object Alerts {
         )
     }
 
+    /**
+     * An agent in herdr needs the user, or finished. Tapping it opens the session and switches herdr to that agent.
+     * Nothing is shown if the user is already looking at that agent.
+     */
+    fun agent(context: Context, session: ActiveSession, agent: HerdrAgent, event: HerdrProtocol.Event) {
+        if (session.listener != null && agent.focused) return
+        val app = context.applicationContext
+        val manager = app.getSystemService(NotificationManager::class.java)
+        manager.createNotificationChannel(
+            NotificationChannel(CHANNEL, "Alerts from sessions", NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "When a program in a session you aren't looking at rings the bell or asks to notify"
+            }
+        )
+        val id = agentNotificationId(session.profile, agent.paneId)
+        val open = PendingIntent.getActivity(
+            app, id,
+            TerminalActivity.intent(app, session.profile)
+                .putExtra(TerminalActivity.EXTRA_FOCUS_AGENT, agent.paneId)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val (heading, category) = when (event) {
+            HerdrProtocol.Event.NEEDS_INPUT -> "${agent.name} needs your input" to Notification.CATEGORY_REMINDER
+            HerdrProtocol.Event.FINISHED -> "${agent.name} finished" to Notification.CATEGORY_STATUS
+        }
+        val text = listOfNotNull(agent.title.takeIf { it.isNotBlank() }, session.profile.label).joinToString(" · ")
+        manager.notify(
+            id,
+            Notification.Builder(app, CHANNEL)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentTitle(heading)
+                .setContentText(text)
+                .setContentIntent(open)
+                .setAutoCancel(true)
+                .setCategory(category)
+                .build(),
+        )
+    }
+
+    /** The agent stopped waiting (answered from another device, say), so its "needs your input" no longer applies. */
+    fun clearAgent(context: Context, profile: Profile, paneId: String) {
+        context.getSystemService(NotificationManager::class.java).cancel(agentNotificationId(profile, paneId))
+    }
+
+    private fun agentNotificationId(profile: Profile, paneId: String) =
+        100_000 + ((profile.id + "/" + paneId).hashCode() and 0xFFFFF)
+
     /** The user is looking at this machine's session now. */
     fun clear(context: Context, profileId: String) {
         context.getSystemService(NotificationManager::class.java).cancel(notificationId(profileId))

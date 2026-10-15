@@ -396,6 +396,8 @@ private val Protocol.label get() = if (this == Protocol.MOSH) "Mosh" else "SSH"
 /** An open session: tap to go back to it, the close button to end it. */
 @Composable
 private fun SessionRow(session: ActiveSession, onResume: () -> Unit, onEnd: () -> Unit) {
+    // A session's fields aren't Compose state; reading the version redraws this row when any of them change.
+    Sessions.version
     val ended = session.finished
     Card(
         onClick = onResume,
@@ -409,9 +411,13 @@ private fun SessionRow(session: ActiveSession, onResume: () -> Unit, onEnd: () -
             leadingContent = { MachineAvatar(session.profile.label, live = !ended) },
             headlineContent = { Text(session.profile.label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
             supportingContent = {
+                val agents = session.herdr?.takeIf { it.available }?.let { HerdrProtocol.summary(it.agents) }
                 Text(
-                    if (ended) "Ended · tap to reconnect"
-                    else "Connected" + (session.route?.let { " via ${it.via}" } ?: "") + " · tap to resume",
+                    when {
+                        ended -> "Ended · tap to reconnect"
+                        agents != null -> agents
+                        else -> "Connected" + (session.route?.let { " via ${it.via}" } ?: "") + " · tap to resume"
+                    },
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )

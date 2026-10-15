@@ -57,6 +57,9 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
 
     private lateinit var keyboardKey: View
 
+    /** herdr's commands, shown when the machine runs herdr. */
+    private lateinit var herdrKey: View
+
     /** JetBrains Mono, for the terminal text. The chrome around it uses the system font, as Material does. */
     private val font: Typeface by lazy { ResourcesCompat.getFont(this, R.font.jetbrains_mono) ?: Typeface.MONOSPACE }
     private val medium: Typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
@@ -135,6 +138,11 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
 
         Sessions.restore(this)
         attach(Sessions.open(this, profile))
+        focusAgentFrom(intent)
+    }
+
+    private fun focusAgentFrom(intent: Intent) {
+        intent.getStringExtra(EXTRA_FOCUS_AGENT)?.let { pane -> session.herdr?.focus(pane) }
     }
 
     /** Opening a host that is already showing here, or switching from the header, reuses this screen. */
@@ -142,6 +150,7 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
         super.onNewIntent(intent)
         val profile = intent.getStringExtra(EXTRA_PROFILE)?.let { store.profile(it) } ?: return
         attach(Sessions.open(this, profile))
+        focusAgentFrom(intent)
     }
 
     private fun attach(active: ActiveSession) {
@@ -264,6 +273,7 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
         statusLine.text = status
         statusLine.setTextColor(color)
         (sessionDot.background as GradientDrawable).setColor(color)
+        herdrKey.visibility = if (session.herdr?.available == true) View.VISIBLE else View.GONE
     }
 
     /** The header's status line: what the connection is doing right now, and its color. */
@@ -280,7 +290,10 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
             route == null -> s.progress.replaceFirstChar { it.uppercase() } to warnColor
             else -> {
                 val port = if (route.port != 22) ":${route.port}" else ""
-                "Connected · $protocol via ${route.via} ${route.ip}$port" to accentColor
+                val agents = s.herdr?.takeIf { it.available }?.let { HerdrProtocol.summary(it.agents) }
+                // With herdr's agents to report, the address gives way to them.
+                if (agents != null) "Connected · $protocol via ${route.via} · $agents" to accentColor
+                else "Connected · $protocol via ${route.via} ${route.ip}$port" to accentColor
             }
         }
     }
@@ -288,6 +301,12 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
     private fun showSessionSwitcher(anchor: View) {
         val all = Sessions.all()
         PopupMenu(this, anchor).apply {
+            // herdr's agents on this machine first: picking one switches herdr to it.
+            session.herdr?.takeIf { it.available }?.agents?.forEach { agent ->
+                val current = if (agent.focused) "  (showing)" else ""
+                menu.add("${HerdrProtocol.glyph(agent.status)} ${agent.label} · ${HerdrProtocol.describe(agent.status)}$current")
+                    .setOnMenuItemClickListener { session.herdr?.focus(agent.paneId); true }
+            }
             all.forEach { other ->
                 val marker = when {
                     other === session -> "● "
@@ -346,6 +365,7 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
         }.place(onTap)
 
         keyboardKey = iconKey(R.drawable.ic_keyboard, "Show or hide the keyboard") { toggleKeyboard() }
+        herdrKey = key("herdr") { showHerdrMenu(it) }.apply { visibility = View.GONE }
         key("Esc") { sendKey(KeyEvent.KEYCODE_ESCAPE) }
         key("Tab") { sendKey(KeyEvent.KEYCODE_TAB) }
         ctrlKey = key("Ctrl") { ctrlLatched = !ctrlLatched; refreshModifiers() }
@@ -444,6 +464,27 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
         altKey.background = keyBackground(altLatched)
         // End any word the keyboard is composing, so ctrl-C doesn't become the start of a word it later revises.
         getSystemService(InputMethodManager::class.java).restartInput(terminalView)
+    }
+
+    /**
+     * herdr's commands as its default keys (prefix Ctrl+B), for a phone keyboard that can't chord them. The agents
+     * are in the header's switcher.
+     */
+    private fun showHerdrMenu(anchor: View) {
+        fun send(keys: String) {
+            if (!session.terminal.isRunning) return
+            terminalView.resetKeyboardInput()
+            val bytes = ("\u0002" + keys).toByteArray()
+            session.terminal.write(bytes, 0, bytes.size)
+        }
+        PopupMenu(this, anchor).apply {
+            listOf(
+                "Workspaces" to "w", "New tab" to "c", "Next tab" to "n", "Previous tab" to "p",
+                "Next pane" to "\t", "Zoom pane" to "z", "Split side by side" to "v", "Split top and bottom" to "-",
+                "Detach" to "q", "Send Ctrl+B" to "\u0002",
+            ).forEach { (label, keys) -> menu.add(label).setOnMenuItemClickListener { send(keys); true } }
+            show()
+        }
     }
 
     private fun showMenu(anchor: View) {
@@ -732,6 +773,9 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
 
     companion object {
         private const val EXTRA_PROFILE = "profile"
+
+        /** A herdr pane to switch to once the session is showing, from an agent's notification. */
+        const val EXTRA_FOCUS_AGENT = "focus_agent"
         private const val JOYSTICK = "✥"
         private val ARROWS = mapOf(
             KeyEvent.KEYCODE_DPAD_LEFT to "←", KeyEvent.KEYCODE_DPAD_RIGHT to "→",
