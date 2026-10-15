@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 108 108">
-  <!-- The Conch shell, as in the launcher icon (res/drawable/ic_launcher_foreground.xml); Play applies its own mask. -->
+  <!-- The Whorl shell, as in the launcher icon (res/drawable/ic_launcher_foreground.xml); Play applies its own mask. -->
   <rect width="108" height="108" fill="#006A6A"/>
   <g transform="rotate(-20 54 56)" stroke="#006A6A" stroke-width="2.4" stroke-linejoin="round">
     <path fill="#FFE2CC" d="M26,58 C26,52 82,52 82,58 C85,66 80,75 71,80 L58,88 C56,90 52,90 50,88 L37,80 C28,75 23,66 26,58 Z"/>

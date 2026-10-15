@@ -1,4 +1,4 @@
-package codes.exterkamp.conch
+package codes.exterkamp.whorl
 
 import android.annotation.SuppressLint
 import android.app.Activity

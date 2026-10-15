@@ -1,6 +1,6 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp" android:height="24dp" android:viewportWidth="72" android:viewportHeight="72">
-    <!-- The Conch shell in outline, for notifications. The source is play/icon.svg. -->
+    <!-- The Whorl shell in outline, for notifications. The source is play/icon.svg. -->
     <group android:pivotX="54" android:pivotY="54" android:scaleX="1.0" android:scaleY="1.0" android:translateX="-18" android:translateY="-18">
         <group android:pivotX="54" android:pivotY="56" android:rotation="-20">
             <path android:strokeColor="#FFFFFFFF" android:strokeWidth="3" android:strokeLineJoin="round" android:pathData="M26,58 C26,52 82,52 82,58 C85,66 80,75 71,80 L58,88 C56,90 52,90 50,88 L37,80 C28,75 23,66 26,58 Z" />

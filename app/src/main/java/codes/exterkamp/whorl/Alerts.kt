@@ -1,4 +1,4 @@
-package codes.exterkamp.conch
+package codes.exterkamp.whorl
 
 import android.app.Notification
 import android.app.NotificationChannel

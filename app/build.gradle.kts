@@ -14,12 +14,12 @@ val uploadKeyProperties = file(System.getenv("POCKETSHELL_SIGNING") ?: "/nonexis
     ?.let { f -> Properties().apply { f.inputStream().use { load(it) } } }
 
 android {
-    namespace = "codes.exterkamp.conch"
+    namespace = "codes.exterkamp.whorl"
     compileSdk = 36
     buildToolsVersion = "36.0.0"
 
     defaultConfig {
-        applicationId = "codes.exterkamp.conch"
+        applicationId = "codes.exterkamp.whorl"
         minSdk = 26
         targetSdk = 36
         versionCode = 2

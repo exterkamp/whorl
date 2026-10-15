@@ -12,5 +12,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "conch"
+rootProject.name = "whorl"
 include(":app", ":terminal-emulator", ":terminal-view")

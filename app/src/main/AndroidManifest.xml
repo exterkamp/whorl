@@ -8,12 +8,12 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
-        android:name=".ConchApp"
+        android:name=".WhorlApp"
         android:allowBackup="false"
         android:extractNativeLibs="true"
         android:icon="@mipmap/ic_launcher"
-        android:label="Conch"
-        android:theme="@style/Theme.Conch">
+        android:label="Whorl"
+        android:theme="@style/Theme.Whorl">
 
         <activity
             android:name=".MainActivity"

@@ -1,4 +1,4 @@
-# Conch
+# Whorl
 
 A bare-bones Android SSH and mosh client. Saved hosts, a terminal and an extra-keys row. No accounts, no
 sign-in, no paid tier, and no network traffic except to your own hosts.

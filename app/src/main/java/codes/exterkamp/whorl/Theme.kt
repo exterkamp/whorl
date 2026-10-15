@@ -1,4 +1,4 @@
-package codes.exterkamp.conch
+package codes.exterkamp.whorl
 
 import android.content.Context
 import android.content.res.Configuration
@@ -70,7 +70,7 @@ fun isDark(context: Context) =
     context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
 
 @Composable
-fun ConchTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
+fun WhorlTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
     MaterialTheme(colorScheme = appColors(LocalContext.current, dark), content = content)
 }
 

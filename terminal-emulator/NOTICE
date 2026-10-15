@@ -1,5 +1,5 @@
 terminal-emulator and terminal-view are copied from termux-app v0.118.0
 (https://github.com/termux/termux-app), which carries them under the Apache
 License 2.0 as a derivative of jackpal's Android-Terminal-Emulator.
-Modified for Conch: TerminalSession runs over a pluggable TerminalTransport
+Modified for Whorl: TerminalSession runs over a pluggable TerminalTransport
 (local pty process or a remote SSH channel) instead of always spawning a process.

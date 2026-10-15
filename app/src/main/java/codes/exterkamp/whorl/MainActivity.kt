@@ -1,4 +1,4 @@
-package codes.exterkamp.conch
+package codes.exterkamp.whorl
 
 import android.Manifest
 import android.content.ClipData
@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -125,7 +126,7 @@ class MainActivity : ComponentActivity() {
         val store = Store.get(this)
         Sessions.restore(this)
         setContent {
-            ConchTheme {
+            WhorlTheme {
                 App(store, resumes) { startActivity(TerminalActivity.intent(this, it)) }
             }
         }
@@ -216,7 +217,7 @@ private fun ShellLogo(size: Int) {
         Modifier.size(size.dp).clip(CircleShape).background(ShellBackground),
         contentAlignment = Alignment.Center,
     ) {
-        Image(painterResource(R.drawable.ic_launcher_foreground), contentDescription = null, Modifier.size((size * 2).dp))
+        Image(painterResource(R.drawable.ic_launcher_foreground), contentDescription = null, Modifier.requiredSize((size * 1.35).dp))
     }
 }
 
@@ -304,7 +305,7 @@ internal fun HostList(
         modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
         topBar = {
             TopAppBar(
-                title = { Text("Conch") },
+                title = { Text("Whorl") },
                 actions = {
                     IconButton(onClick = onDeviceKey) { Icon(Icons.Default.Lock, "Device key") }
                     IconButton(onClick = onAbout) { Icon(Icons.Default.Info, "About") }
@@ -705,12 +706,12 @@ internal fun About(onBack: () -> Unit) {
             Spacer(Modifier.height(24.dp))
             ShellLogo(96)
             Spacer(Modifier.height(16.dp))
-            Text("Conch", style = MaterialTheme.typography.headlineMedium)
+            Text("Whorl", style = MaterialTheme.typography.headlineMedium)
             if (version.isNotEmpty()) {
                 Text("Version $version", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Text(
-                "A plain SSH and mosh client. No accounts, no analytics, no ads. Conch only talks to the machines " +
+                "A plain SSH and mosh client. No accounts, no analytics, no ads. Whorl only talks to the machines " +
                     "you add, and their passwords and keys stay encrypted on this device.",
                 style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Center,

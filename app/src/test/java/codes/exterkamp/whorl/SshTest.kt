@@ -1,4 +1,4 @@
-package codes.exterkamp.conch
+package codes.exterkamp.whorl
 
 import com.jcraft.jsch.ChannelExec
 import com.jcraft.jsch.JSch
@@ -40,7 +40,7 @@ class SshTest {
         val host = System.getenv("TEST_SSH_HOST")
         assumeTrue("TEST_SSH_HOST not set", host != null)
 
-        val (private, public) = Ssh.newKey("conch-test")
+        val (private, public) = Ssh.newKey("whorl-test")
 
         // Install the new key using the test account's password.
         session(host!!) { setPassword("test") }.use { exec(it, "mkdir -p ~/.ssh && echo '$public' >> ~/.ssh/authorized_keys") }
