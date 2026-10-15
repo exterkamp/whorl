@@ -4,6 +4,8 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+    // Screenshot tests that render screens on the JVM: ./build.sh recordPaparazziDebug
+    id("app.cash.paparazzi")
 }
 
 // The Play upload key lives outside the repo (see PLAY.md). Without it, release builds are signed with the
@@ -77,7 +79,6 @@ dependencies {
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
     implementation(platform("androidx.compose:compose-bom:2024.06.00"))
     implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.material:material-icons-core")
     implementation("androidx.compose.ui:ui")
 
     testImplementation("junit:junit:4.13.2")
