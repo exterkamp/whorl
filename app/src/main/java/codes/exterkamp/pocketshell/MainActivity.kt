@@ -11,11 +11,6 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -140,20 +135,13 @@ private val TuiShapes = RoundedCornerShape(0.dp).let { square ->
     Shapes(extraSmall = square, small = square, medium = square, large = square, extraLarge = square)
 }
 
-/** A screen title like a shell prompt's working directory, with a blinking block cursor. */
+/** A screen title like a shell prompt's working directory. */
 @Composable
 private fun TuiTitle(path: String) {
-    val blink by rememberInfiniteTransition(label = "cursor").animateFloat(
-        initialValue = 1f, targetValue = 0f,
-        animationSpec = infiniteRepeatable(tween(530, easing = { if (it < 0.5f) 0f else 1f }), RepeatMode.Restart),
-        label = "cursor",
-    )
     Text(
         buildAnnotatedString {
             withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) { append("~/") }
             withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary)) { append(path) }
-            append(" ")
-            withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary.copy(alpha = blink))) { append("█") }
         },
         fontWeight = FontWeight.Bold,
     )
