@@ -768,8 +768,9 @@ public final class TerminalView extends View {
             stopTextSelectionMode();
         }
         // PocketShell: a key sent as a key rather than as text (Enter, Backspace on an empty line, a hardware
-        // keyboard) changes the line behind the keyboard's back.
-        resetKeyboardInput();
+        // keyboard) changes the line behind the keyboard's back. Modifiers don't, and restarting the keyboard on
+        // one would drop its own state: Gboard sends Shift as a key, and a restart turns Shift back off.
+        if (!KeyEvent.isModifierKey(keyCode) && keyCode != KeyEvent.KEYCODE_CAPS_LOCK) resetKeyboardInput();
 
         if (mClient.onKeyDown(keyCode, event, mTermSession)) {
             invalidate();
