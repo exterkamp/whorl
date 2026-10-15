@@ -22,8 +22,8 @@ android {
         applicationId = "codes.exterkamp.whorl"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.3.0"
         ndk {
             // mosh-client is only built for arm64.
             abiFilters += "arm64-v8a"
