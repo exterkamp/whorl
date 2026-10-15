@@ -25,12 +25,29 @@ import java.util.concurrent.TimeUnit
 interface PromptUi {
     fun askYesNo(title: String, message: String, answer: (Boolean) -> Unit)
     fun askSecret(title: String, message: String, answer: (String?) -> Unit)
+
+    /** This session was reconnected as [next]; show that instead. */
+    fun replaced(next: ActiveSession)
+
+    /** Something shown about the session changed, such as the route it took. */
+    fun refresh()
 }
 
-class ActiveSession(val profile: Profile) : Prompter {
+class ActiveSession(
+    val profile: Profile,
+    /** Started by the app after a dropped connection or a network change, rather than by the user. */
+    val automatic: Boolean = false,
+) : Prompter {
     lateinit var terminal: TerminalSession
     lateinit var transport: com.termux.terminal.TerminalTransport
     @Volatile var finished = false
+
+    /** How the connection reached the machine; null until it's up. */
+    @Volatile var route: Route? = null
+        private set
+
+    /** The session that took over when this one was reconnected. Main thread only. */
+    var replacedBy: ActiveSession? = null
 
     /** The screen currently showing this session, if any. */
     @Volatile var ui: PromptUi? = null
@@ -71,6 +88,11 @@ class ActiveSession(val profile: Profile) : Prompter {
         ask<String?>(null) { ui, answer -> ui.askSecret(title, message, answer) }
 
     override fun status(text: String) = terminal.printLocal("\u001b[2m$text\u001b[0m\r\n")
+
+    override fun connected(route: Route) {
+        this.route = route
+        main.post { ui?.refresh() }
+    }
 }
 
 /** Live sessions, which outlive any screen showing them. Main thread only. */
@@ -109,9 +131,31 @@ object Sessions {
     fun open(context: Context, profile: Profile): ActiveSession {
         sessions.values.firstOrNull { it.profile.id == profile.id && !it.finished }?.let { return it }
         sessions.values.filter { it.profile.id == profile.id }.forEach { remove(context, it) }
+        return start(context, profile, automatic = false)
+    }
 
+    /**
+     * Reconnect [old] as a new session for the same machine, racing its addresses again. The mosh-server it was
+     * using is stopped by the new connection (its pid is still stored), and the multiplexer in the run-on-connect
+     * command, if any, puts the user back where they were. Whatever screen shows [old] switches to the new one.
+     */
+    fun reconnect(context: Context, old: ActiveSession, automatic: Boolean): ActiveSession {
+        val size = old.terminal.emulator?.let { it.mColumns to it.mRows } ?: (80 to 24)
+        val ui = old.ui
+        sessions.remove(old.profile.id)
+        val next = start(context, old.profile, automatic)
+        old.replacedBy = next
+        old.attach(null)
+        old.listener = null
+        old.terminal.finishIfRunning()
+        next.terminal.updateSize(size.first, size.second)
+        ui?.replaced(next)
+        return next
+    }
+
+    private fun start(context: Context, profile: Profile, automatic: Boolean): ActiveSession {
         val app = context.applicationContext
-        val active = ActiveSession(profile)
+        val active = ActiveSession(profile, automatic)
         val transport = when (profile.protocol) {
             Protocol.SSH -> SshTransport(app, profile, active)
             Protocol.MOSH -> MoshTransport(app, profile, active)
@@ -129,6 +173,8 @@ object Sessions {
     /** The user ended this session: stop it and don't bring it back on the next launch. */
     fun remove(context: Context, session: ActiveSession) {
         session.terminal.finishIfRunning()
+        // Already reconnected: the new session owns the machine's slot, its mosh-server and its place in the list.
+        if (session.replacedBy != null) return
         (session.transport as? MoshTransport)?.forgetServer()
         Store.get(context).let { it.openSessions = it.openSessions - session.profile.id }
         sessions.remove(session.profile.id)
@@ -137,11 +183,25 @@ object Sessions {
     }
 
     /** Hands terminal events to whichever screen is attached, and tracks when sessions end. */
+    /** Sessions worth reconnecting without being asked: dropped, or an automatic reconnect that hasn't got through. */
+    fun stalled(): List<ActiveSession> = sessions.values.filter {
+        it.finished && it.replacedBy == null &&
+            (it.terminal.exitStatus == EXIT_DROPPED || it.automatic && it.route == null)
+    }
+
+    /** Live sessions and the route each one is using. */
+    fun routed(): List<Pair<ActiveSession, Route>> =
+        sessions.values.filter { !it.finished }.mapNotNull { s -> s.route?.let { s to it } }
+
+    fun isCurrent(session: ActiveSession) = sessions[session.profile.id] === session
+
     private class Forwarder(private val app: Context, private val active: ActiveSession) : TerminalSessionClient {
         override fun onTextChanged(s: TerminalSession) { active.listener?.onTextChanged(s) }
         override fun onTitleChanged(s: TerminalSession) { active.listener?.onTitleChanged(s) }
         override fun onSessionFinished(s: TerminalSession) {
             active.finished = true
+            // Replaced by a reconnect: the new session carries on, and nothing about this one matters any more.
+            if (active.replacedBy != null) return
             if (s.exitStatus == 0) {
                 // The shell exited normally (the user typed exit): nothing to reattach to later.
                 (active.transport as? MoshTransport)?.forgetServer()
@@ -150,6 +210,7 @@ object Sessions {
             SessionService.update(app)
             version++
             active.listener?.onSessionFinished(s)
+            if (s.exitStatus == EXIT_DROPPED) Reconnector.dropped(app)
         }
         override fun onCopyTextToClipboard(s: TerminalSession, text: String) { active.listener?.onCopyTextToClipboard(s, text) }
         override fun onPasteTextFromClipboard(s: TerminalSession?) { active.listener?.onPasteTextFromClipboard(s) }
@@ -171,6 +232,16 @@ object Sessions {
 class SessionService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onCreate() {
+        super.onCreate()
+        Reconnector.watch(this)
+    }
+
+    override fun onDestroy() {
+        Reconnector.unwatch(this)
+        super.onDestroy()
+    }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val live = Sessions.all().filterNot { it.finished }

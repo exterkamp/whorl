@@ -12,10 +12,60 @@ enum class Protocol { SSH, MOSH }
 
 enum class AuthMethod { DEVICE_KEY, PASSWORD }
 
+/** One way to reach a machine: an IP address or DNS name, with its own port if it differs from the machine's. */
+data class Address(val host: String, val port: Int = 0) {
+    fun portOr(default: Int) = if (port > 0) port else default
+
+    /** What kind of network this address is on, for the session header: "local", "tailscale", or the host itself. */
+    val kind: String
+        get() {
+            val h = host.lowercase().trimEnd('.')
+            val v4 = h.split('.').takeIf { it.size == 4 }?.map { it.toIntOrNull() ?: -1 }?.takeIf { p -> p.all { it in 0..255 } }
+            return when {
+                h.endsWith(".ts.net") || h.startsWith("fd7a:115c:a1e0:") -> "tailscale"
+                v4 != null && v4[0] == 100 && v4[1] in 64..127 -> "tailscale"
+                v4 != null && (v4[0] == 10 || v4[0] == 172 && v4[1] in 16..31 || v4[0] == 192 && v4[1] == 168 ||
+                    v4[0] == 169 && v4[1] == 254) -> "local"
+                h.endsWith(".local") || h.endsWith(".lan") || h.endsWith(".home.arpa") || '.' !in h && ':' !in h -> "local"
+                else -> host
+            }
+        }
+
+    /** How it's typed in the editor: host, host:port, or [ipv6]:port. */
+    override fun toString() = when {
+        port <= 0 -> host
+        ':' in host -> "[$host]:$port"
+        else -> "$host:$port"
+    }
+
+    fun toJson(): JSONObject = JSONObject().put("host", host).put("port", port)
+
+    companion object {
+        fun fromJson(o: JSONObject) = Address(o.optString("host"), o.optInt("port", 0))
+
+        /** Parse what the editor shows; null if it isn't a usable address. */
+        fun parse(text: String): Address? {
+            val t = text.trim()
+            if (t.isEmpty() || t.any { it.isWhitespace() }) return null
+            fun port(p: String) = p.toIntOrNull()?.takeIf { it in 1..65535 }
+            Regex("""\[([^\]]+)](?::(\d+))?""").matchEntire(t)?.let { m ->
+                val p = m.groupValues[2]
+                return Address(m.groupValues[1], if (p.isEmpty()) 0 else port(p) ?: return null)
+            }
+            // More than one colon is a bare IPv6 address.
+            if (t.count { it == ':' } != 1) return Address(t)
+            val host = t.substringBefore(':').ifEmpty { return null }
+            return Address(host, port(t.substringAfter(':')) ?: return null)
+        }
+    }
+}
+
 data class Profile(
     val id: String = UUID.randomUUID().toString(),
     val name: String = "",
-    val host: String = "",
+    /** Tried in this order, earlier ones preferred; see [Reach]. E.g. the LAN address, then the Tailscale one. */
+    val addresses: List<Address> = emptyList(),
+    /** For addresses that don't give their own. */
     val port: Int = 22,
     val user: String = "",
     val protocol: Protocol = Protocol.MOSH,
@@ -27,10 +77,14 @@ data class Profile(
     /** Typed into the shell once connected, e.g. "herdr" or "tmux new -A -s main". Empty for none. */
     val startup: String = "",
 ) {
-    val label: String get() = name.ifBlank { "$user@$host" }
+    val label: String get() = name.ifBlank { "$user@${addresses.firstOrNull()?.host.orEmpty()}" }
+
+    /** Where trusted host keys are filed in known_hosts. One per machine, since every address reaches the same sshd. */
+    val hostKeyAlias: String get() = "pocketshell-machine-$id"
 
     fun toJson(): JSONObject = JSONObject()
-        .put("id", id).put("name", name).put("host", host).put("port", port).put("user", user)
+        .put("id", id).put("name", name).put("port", port).put("user", user)
+        .put("addresses", JSONArray().apply { addresses.forEach { put(it.toJson()) } })
         .put("protocol", protocol.name).put("auth", auth.name).put("password", password)
         .put("moshServer", moshServer).put("startup", startup)
 
@@ -49,7 +103,9 @@ data class Profile(
         fun fromJson(o: JSONObject) = Profile(
             id = o.getString("id"),
             name = o.optString("name"),
-            host = o.optString("host"),
+            addresses = o.optJSONArray("addresses")?.let { a -> (0 until a.length()).map { Address.fromJson(a.getJSONObject(it)) } }
+                // Saved before machines had more than one address.
+                ?: listOfNotNull(o.optString("host").takeIf { it.isNotBlank() }?.let { Address(it) }),
             port = o.optInt("port", 22),
             user = o.optString("user"),
             protocol = Protocol.valueOf(o.optString("protocol", Protocol.MOSH.name)),

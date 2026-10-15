@@ -66,6 +66,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -262,7 +263,11 @@ private fun HostList(
                         Column(Modifier.weight(1f)) {
                             Text(profile.label, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
                             Text(
-                                "${profile.user}@${profile.host}" + if (profile.port != 22) ":${profile.port}" else "",
+                                profile.addresses.firstOrNull().let { first ->
+                                    "${profile.user}@${first?.host.orEmpty()}" +
+                                        (first?.portOr(profile.port)?.takeIf { it != 22 }?.let { ":$it" } ?: "") +
+                                        if (profile.addresses.size > 1) "  +${profile.addresses.size - 1}" else ""
+                                },
                                 fontFamily = FontFamily.Monospace,
                                 fontSize = 13.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -343,7 +348,8 @@ private fun EditHost(
     onBack: () -> Unit,
 ) {
     var name by remember { mutableStateOf(initial.name) }
-    var host by remember { mutableStateOf(initial.host) }
+    // What's typed, one per address; a blank one is ignored.
+    val addresses = remember { mutableStateListOf(*initial.addresses.map { it.toString() }.ifEmpty { listOf("") }.toTypedArray()) }
     var port by remember { mutableStateOf(initial.port.toString()) }
     var user by remember { mutableStateOf(initial.user) }
     var protocol by remember { mutableStateOf(initial.protocol) }
@@ -354,19 +360,20 @@ private fun EditHost(
     var confirmDelete by remember { mutableStateOf(false) }
 
     val portNumber = port.toIntOrNull()?.takeIf { it in 1..65535 }
-    val valid = host.isNotBlank() && user.isNotBlank() && portNumber != null
+    val parsed = addresses.filter { it.isNotBlank() }.map { Address.parse(it) }
+    val valid = parsed.isNotEmpty() && parsed.all { it != null } && user.isNotBlank() && portNumber != null
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (isNew) "New host" else "Edit host") },
+                title = { Text(if (isNew) "New machine" else "Edit machine") },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
                 actions = {
                     if (!isNew) IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Default.Delete, "Delete") }
                     TextButton(enabled = valid, onClick = {
                         onSave(
                             initial.copy(
-                                name = name.trim(), host = host.trim(), port = portNumber!!, user = user.trim(),
+                                name = name.trim(), addresses = parsed.filterNotNull().distinct(), port = portNumber!!, user = user.trim(),
                                 protocol = protocol, auth = auth,
                                 password = if (auth == AuthMethod.PASSWORD) password else "",
                                 moshServer = moshServer.trim().ifEmpty { Profile.DEFAULT_MOSH_SERVER },
@@ -384,7 +391,42 @@ private fun EditHost(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Field("Name", name, { name = it }, placeholder = "optional")
-            Field("Host", host, { host = it }, keyboard = KeyboardType.Uri, mono = true)
+            addresses.forEachIndexed { i, text ->
+                val address = Address.parse(text)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.weight(1f)) {
+                        OutlinedTextField(
+                            value = text,
+                            onValueChange = { addresses[i] = it },
+                            label = { Text(if (addresses.size == 1) "Address" else "Address ${i + 1}") },
+                            placeholder = { Text("IP or DNS name, :port optional") },
+                            supportingText = when {
+                                text.isBlank() -> null
+                                address == null -> { { Text("Not an address") } }
+                                else -> { { Text(address.kind.takeIf { it != address.host } ?: "internet") } }
+                            },
+                            isError = text.isNotBlank() && address == null,
+                            singleLine = true,
+                            textStyle = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.Monospace),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, autoCorrect = false),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                    if (addresses.size > 1) {
+                        IconButton(onClick = { addresses.removeAt(i) }) {
+                            Icon(Icons.Default.Close, "Remove address", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+            TextButton(onClick = { addresses.add("") }) { Text("+ Add address") }
+            Text(
+                "Add each way to reach this machine, e.g. its LAN address and its Tailscale one. All are tried on " +
+                    "connect and the first to answer is used, preferring the ones listed first. If the network " +
+                    "changes and that address stops answering, the session reconnects over another.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Box(Modifier.weight(2f)) { Field("User", user, { user = it }, mono = true) }
                 Box(Modifier.weight(1f)) { Field("Port", port, { port = it.filter(Char::isDigit) }, keyboard = KeyboardType.Number, mono = true) }

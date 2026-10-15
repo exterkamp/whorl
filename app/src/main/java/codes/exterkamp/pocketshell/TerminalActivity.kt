@@ -109,7 +109,7 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
         if (::session.isInitialized && session !== active) {
             unbindListeners()
             // A session that ended and is being switched away from has nothing left to show.
-            if (session.finished) Sessions.remove(this, session)
+            if (session.finished && session.replacedBy == null) Sessions.remove(this, session)
         }
         session = active
         title = active.profile.label
@@ -126,6 +126,10 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
     override fun onResume() {
         super.onResume()
         isPaused = false
+        // Reconnected while this screen was in the background.
+        var current = session
+        while (true) current = current.replacedBy ?: break
+        if (current !== session) attach(current)
         bindListeners()
         // Catch up on anything that arrived while we weren't listening.
         terminalView.onScreenUpdated()
@@ -206,7 +210,9 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
 
     private fun refreshHeader() {
         val others = Sessions.all().count { it !== session }
-        sessionTitle.text = session.profile.label + if (others > 0) "  ·  +$others" else ""
+        // Which address the connection took, when the machine has more than one.
+        val via = session.route?.takeIf { session.profile.addresses.size > 1 }?.let { "  ·  ${it.via}" }.orEmpty()
+        sessionTitle.text = session.profile.label + via + if (others > 0) "  ·  +$others" else ""
         (sessionDot.background as GradientDrawable).setColor(if (session.finished) MUTED else ACCENT)
     }
 
@@ -319,7 +325,7 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
             setPadding(dp(12), dp(10), dp(12), dp(10))
             setOnClickListener { onTap() }
         })
-        button("Reconnect") { attach(Sessions.open(this@TerminalActivity, session.profile)) }
+        button("Reconnect") { Sessions.reconnect(this@TerminalActivity, session, automatic = false) }
         button("Close") { endSession() }
     }
 
@@ -345,6 +351,10 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
     }
 
     // ---- PromptUi -----------------------------------------------------------------------------------------------
+
+    override fun replaced(next: ActiveSession) = attach(next)
+
+    override fun refresh() = refreshHeader()
 
     override fun askYesNo(title: String, message: String, answer: (Boolean) -> Unit) {
         var answered = false

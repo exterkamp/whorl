@@ -4,9 +4,12 @@ import android.content.Context
 import android.os.Build
 import com.jcraft.jsch.ChannelExec
 import com.jcraft.jsch.ChannelShell
+import com.jcraft.jsch.HostKey
 import com.jcraft.jsch.JSch
+import com.jcraft.jsch.JSchChangedHostKeyException
 import com.jcraft.jsch.KeyPair
 import com.jcraft.jsch.Session
+import com.jcraft.jsch.SocketFactory
 import com.jcraft.jsch.UIKeyboardInteractive
 import com.jcraft.jsch.UserInfo
 import com.termux.terminal.ProcessTransport
@@ -15,7 +18,8 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
-import java.net.InetAddress
+import java.net.Socket
+import java.util.Base64
 import java.util.concurrent.Executors
 
 /** What a connection needs from whoever is watching it. Calls come from a background thread and may block. */
@@ -27,7 +31,13 @@ interface Prompter {
 
     /** Progress text shown in the terminal. */
     fun status(text: String)
+
+    /** The connection is up, over this route. */
+    fun connected(route: Route) {}
 }
+
+/** Exit status for a connection that dropped, as opposed to a shell that exited. Same as ssh(1) uses. */
+const val EXIT_DROPPED = 255
 
 class ConnectException(message: String) : Exception(message)
 
@@ -47,51 +57,94 @@ object Ssh {
     }
 
     /**
-     * Resolve the profile's host, open an authenticated SSH session to it, and return the session with the address
-     * it actually reached, which mosh needs.
+     * Find which of the machine's addresses answers, open an authenticated SSH session over it, and return the
+     * session with the route it took, which mosh needs.
      */
-    fun open(context: Context, profile: Profile, prompter: Prompter): Pair<Session, String> {
+    fun open(context: Context, profile: Profile, prompter: Prompter): Pair<Session, Route> {
         val store = Store.get(context)
         val jsch = jsch(context)
+        adoptLegacyHostKeys(jsch, profile)
 
         if (profile.auth == AuthMethod.DEVICE_KEY) {
-            val key = store.deviceKey ?: throw ConnectException("No device key yet. Create one from the key icon on the host list.")
+            val key = store.deviceKey ?: throw ConnectException("No device key yet. Create one from the key icon on the machine list.")
             jsch.addIdentity("device", key.toByteArray(), store.devicePublicKey?.toByteArray(), null)
         }
+        if (profile.addresses.isEmpty()) throw ConnectException("${profile.label} has no addresses.")
 
-        prompter.status("Resolving ${profile.host}…")
-        val address = try {
-            InetAddress.getByName(profile.host).hostAddress!!
-        } catch (e: Exception) {
-            throw ConnectException("Can't resolve ${profile.host}")
-        }
-
-        prompter.status("Connecting to ${profile.user}@${profile.host}:${profile.port}…")
-        val session = jsch.getSession(profile.user, address, profile.port)
-        // Remember host keys by the name the user typed, not whatever address it resolved to today.
-        session.setHostKeyAlias(if (profile.port == 22) profile.host else "[${profile.host}]:${profile.port}")
-        session.setConfig("StrictHostKeyChecking", "ask")
-        session.setConfig(
-            "PreferredAuthentications",
-            if (profile.auth == AuthMethod.DEVICE_KEY) "publickey" else "keyboard-interactive,password",
-        )
-        session.setServerAliveInterval(30_000)
-        session.userInfo = PromptingUserInfo(profile, prompter)
-        try {
-            session.connect(15_000)
-        } catch (e: Exception) {
-            val reason = e.message ?: e.toString()
-            throw ConnectException(
-                when {
-                    reason.contains("Auth fail", ignoreCase = true) && profile.auth == AuthMethod.DEVICE_KEY ->
-                        "Authentication failed. Is this device's public key in ~/.ssh/authorized_keys on ${profile.host}?"
-                    reason.contains("Auth fail", ignoreCase = true) -> "Authentication failed."
-                    reason.contains("reject HostKey", ignoreCase = true) -> "Host key not accepted."
-                    else -> reason
-                }
+        // An address that turns out to be some other machine (the same private IP on another network) is dropped,
+        // and the rest are raced again.
+        val candidates = profile.addresses.toMutableList()
+        while (true) {
+            prompter.status(
+                if (candidates.size == 1) "Connecting to ${profile.user}@${candidates[0]}…"
+                else "Trying ${candidates.joinToString(", ")}…"
             )
+            val (route, socket) = try {
+                Reach.connect(candidates, profile.port)
+            } catch (e: Reach.Unreachable) {
+                throw ConnectException(
+                    if (e.failures.size == 1) "Can't reach ${e.failures[0].first}: ${e.failures[0].second}"
+                    else "Can't reach ${profile.label}:\r\n" + e.failures.joinToString("\r\n") { (a, why) -> "  $a: $why" }
+                )
+            }
+            if (profile.addresses.size > 1) prompter.status("Connected via ${route.via} (${route.address})")
+
+            val session = jsch.getSession(profile.user, route.ip, route.port)
+            session.setSocketFactory(Preconnected(socket))
+            session.setHostKeyAlias(profile.hostKeyAlias)
+            session.setConfig("StrictHostKeyChecking", "ask")
+            session.setConfig(
+                "PreferredAuthentications",
+                if (profile.auth == AuthMethod.DEVICE_KEY) "publickey" else "keyboard-interactive,password",
+            )
+            session.setServerAliveInterval(30_000)
+            session.userInfo = PromptingUserInfo(profile, prompter, rejectChangedKey = candidates.size > 1)
+            try {
+                session.connect(15_000)
+                return session to route
+            } catch (e: JSchChangedHostKeyException) {
+                socket.close()
+                if (candidates.size == 1) throw ConnectException("Host key not accepted.")
+                prompter.status("${route.address} answered as a different machine; skipping it.")
+                candidates.remove(route.address)
+            } catch (e: Exception) {
+                socket.close()
+                val reason = e.message ?: e.toString()
+                throw ConnectException(
+                    when {
+                        reason.contains("Auth fail", ignoreCase = true) && profile.auth == AuthMethod.DEVICE_KEY ->
+                            "Authentication failed. Is this device's public key in ~/.ssh/authorized_keys on ${profile.label}?"
+                        reason.contains("Auth fail", ignoreCase = true) -> "Authentication failed."
+                        reason.contains("reject HostKey", ignoreCase = true) -> "Host key not accepted."
+                        else -> reason
+                    }
+                )
+            }
         }
-        return session to address
+    }
+
+    /**
+     * Host keys used to be filed under the host name as typed. Copy any found under one of this machine's
+     * addresses to its per-machine alias, so upgrading doesn't ask to trust a known machine again.
+     */
+    private fun adoptLegacyHostKeys(jsch: JSch, profile: Profile) {
+        val repo = jsch.hostKeyRepository
+        if (!repo.getHostKey(profile.hostKeyAlias, null).isNullOrEmpty()) return
+        for (address in profile.addresses) {
+            val port = address.portOr(profile.port)
+            val legacy = if (port == 22) address.host else "[${address.host}]:$port"
+            val keys = repo.getHostKey(legacy, null)
+            if (keys.isNullOrEmpty()) continue
+            keys.forEach { repo.add(HostKey(profile.hostKeyAlias, Base64.getDecoder().decode(it.key)), null) }
+            return
+        }
+    }
+
+    /** Hands JSch the socket that won the race instead of letting it dial again. */
+    private class Preconnected(private val socket: Socket) : SocketFactory {
+        override fun createSocket(host: String, port: Int): Socket = socket
+        override fun getInputStream(socket: Socket): InputStream = socket.getInputStream()
+        override fun getOutputStream(socket: Socket): OutputStream = socket.getOutputStream()
     }
 
     /** Generate a fresh ed25519 key and make it the device key. */
@@ -175,11 +228,19 @@ object Ssh {
     }
 }
 
-private class PromptingUserInfo(private val profile: Profile, private val prompter: Prompter) : UserInfo, UIKeyboardInteractive {
+private class PromptingUserInfo(
+    private val profile: Profile,
+    private val prompter: Prompter,
+    /** Refuse a changed host key without asking, because another address may still reach the right machine. */
+    private val rejectChangedKey: Boolean,
+) : UserInfo, UIKeyboardInteractive {
     private var password: String? = null
     private var triedSaved = false
 
-    override fun promptYesNo(message: String): Boolean = prompter.yesNo("Host key", message)
+    override fun promptYesNo(message: String): Boolean {
+        if (rejectChangedKey && message.contains("IDENTIFICATION HAS CHANGED", ignoreCase = true)) return false
+        return prompter.yesNo("Host key", message)
+    }
 
     override fun showMessage(message: String) = prompter.status(message)
 
@@ -225,9 +286,10 @@ class SshTransport(
     private val io = Executors.newSingleThreadExecutor()
     @Volatile private var session: Session? = null
     @Volatile private var channel: ChannelShell? = null
+    @Volatile private var closed = false
 
     override fun connect(columns: Int, rows: Int) {
-        val (session, _) = Ssh.open(context, profile, prompter)
+        val (session, route) = Ssh.open(context, profile, prompter)
         this.session = session
         val channel = session.openChannel("shell") as ChannelShell
         channel.setPtyType("xterm-256color", columns, rows, 0, 0)
@@ -235,6 +297,7 @@ class SshTransport(
         channel.setEnv("COLORTERM", "truecolor")
         this.channel = channel
         channel.connect(10_000)
+        prompter.connected(route)
         typeStartup(channel.outputStream, profile)
     }
 
@@ -251,11 +314,16 @@ class SshTransport(
         val channel = channel ?: return 1
         while (!channel.isClosed && session?.isConnected == true) Thread.sleep(200)
         // No exit status means the connection dropped rather than the shell exiting.
-        return if (channel.exitStatus < 0) 1 else channel.exitStatus
+        return when {
+            channel.exitStatus >= 0 -> channel.exitStatus
+            closed -> 1
+            else -> EXIT_DROPPED
+        }
     }
 
     // Called on disconnect and again when the session cleans up.
     override fun close() {
+        closed = true
         runCatching {
             io.execute {
                 channel?.disconnect()
@@ -279,7 +347,7 @@ class MoshTransport(
     @Volatile private var closed = false
 
     override fun connect(columns: Int, rows: Int) {
-        val (session, address) = Ssh.open(context, profile, prompter)
+        val (session, route) = Ssh.open(context, profile, prompter)
         val store = Store.get(context)
         val (port, key) = try {
             stopPreviousServer(session, store.moshServerPid(profile.id))
@@ -299,10 +367,11 @@ class MoshTransport(
             "HOME=${context.filesDir.path}",
             "TMPDIR=${context.cacheDir.path}",
         )
-        prompter.status("mosh: $address:$port\r\n")
-        val client = ProcessTransport(executable, context.filesDir.path, arrayOf(executable, address, port), env)
+        prompter.status("mosh: ${route.ip}:$port\r\n")
+        val client = ProcessTransport(executable, context.filesDir.path, arrayOf(executable, route.ip, port), env)
         this.client = client
         client.connect(columns, rows)
+        prompter.connected(route)
         typeStartup(client.outputStream, profile)
     }
 
