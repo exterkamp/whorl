@@ -5,5 +5,7 @@
         <item name="android:colorAccent">@color/accent</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
+        <!-- The app draws its own dark mode; a phone that force-darkens apps would darken backgrounds but not text. -->
+        <item name="android:forceDarkAllowed">false</item>
     </style>
 </resources>

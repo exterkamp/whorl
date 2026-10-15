@@ -351,7 +351,10 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
         ctrlKey = key("Ctrl") { ctrlLatched = !ctrlLatched; refreshModifiers() }
         altKey = key("Alt") { altLatched = !altLatched; refreshModifiers() }
         joystick(key(JOYSTICK) {})
-        for (c in listOf("-", "/", "|", "~", "`")) key(c) { terminalView.inputCodePoint(c.codePointAt(0), false, false) }.typeface = font
+        for (c in listOf("-", "/", "|", "~", "`")) key(c) {
+            terminalView.resetKeyboardInput()
+            terminalView.inputCodePoint(c.codePointAt(0), false, false)
+        }.typeface = font
         key("Home") { sendKey(KeyEvent.KEYCODE_MOVE_HOME) }
         key("End") { sendKey(KeyEvent.KEYCODE_MOVE_END) }
         key("PgUp") { sendKey(KeyEvent.KEYCODE_PAGE_UP) }
@@ -429,6 +432,7 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
 
     private fun sendKey(keyCode: Int) {
         if (!session.terminal.isRunning) return
+        terminalView.resetKeyboardInput()
         var mods = 0
         if (readControlKey()) mods = mods or KeyHandler.KEYMOD_CTRL
         if (readAltKey()) mods = mods or KeyHandler.KEYMOD_ALT
@@ -508,7 +512,10 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
     private fun paste() {
         val clip = getSystemService(ClipboardManager::class.java).primaryClip ?: return
         val text = clip.getItemAt(0)?.coerceToText(this)?.toString() ?: return
-        if (session.terminal.isRunning) session.terminal.emulator?.paste(text)
+        if (session.terminal.isRunning) {
+            terminalView.resetKeyboardInput()
+            session.terminal.emulator?.paste(text)
+        }
     }
 
     private fun showKeyboard() {

@@ -19,6 +19,8 @@ import android.view.HapticFeedbackConstants;
 import android.view.InputDevice;
 import android.view.KeyCharacterMap;
 import android.view.KeyEvent;
+import android.view.inputmethod.InputMethodManager;
+import android.text.Selection;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
@@ -301,24 +303,32 @@ public final class TerminalView extends View {
 
         return new BaseInputConnection(this, true) {
 
-            /** The composing text the terminal has already been sent; it is revised with backspaces. */
+            /**
+             * PocketShell: the editor holds everything the keyboard has typed on the current line, which the terminal
+             * has too. Keyboards edit it freely: composing a swiped word, swapping in a suggestion, correcting the
+             * spelling of an earlier word, deleting. After each edit the terminal is brought in line by backspacing
+             * to the first character that changed and typing the rest. A key that isn't text (Enter, an arrow, the
+             * extra keys) starts a fresh line; see {@link #resetKeyboardInput()}.
+             */
             private String mSent = "";
 
-            /**
-             * Bring what the terminal has of the word being composed up to date: backspace over where it differs
-             * from [text], then type the rest. So a swiped word appears at once, and picking a suggestion fixes it.
-             */
-            private void syncComposing(CharSequence text) {
-                String now = text.toString();
+            private boolean sync() {
+                if (mEmulator == null) return true;
+                String now = getEditable().toString();
                 int common = 0;
                 int max = Math.min(now.length(), mSent.length());
                 while (common < max && now.charAt(common) == mSent.charAt(common)) common++;
                 if (common > 0 && Character.isHighSurrogate(now.charAt(common - 1))) common--;
                 int stale = mSent.codePointCount(common, mSent.length());
-                KeyEvent deleteKey = new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL);
-                for (int i = 0; i < stale; i++) sendKeyEvent(deleteKey);
+                for (int i = 0; i < stale; i++) mTermSession.writeCodePoint(false, 127);
                 sendTextToTerminal(now.substring(common));
                 mSent = now;
+                // A newline (some keyboards' Enter) ends the line: the shell has moved on, so the editor does too.
+                if (now.indexOf('\n') >= 0) {
+                    mSent = "";
+                    getEditable().clear();
+                }
+                return true;
             }
 
             @Override
@@ -326,18 +336,21 @@ public final class TerminalView extends View {
                 if (TERMINAL_VIEW_KEY_LOGGING_ENABLED) {
                     mClient.logInfo(LOG_TAG, "IME: setComposingText(\"" + text + "\", " + newCursorPosition + ")");
                 }
-                if (mEmulator != null) syncComposing(text);
-                return super.setComposingText(text, newCursorPosition);
+                super.setComposingText(text, newCursorPosition);
+                return sync();
+            }
+
+            @Override
+            public boolean setComposingRegion(int start, int end) {
+                // Marks an earlier word for replacement (a spelling correction); nothing changes until the new text.
+                return super.setComposingRegion(start, end);
             }
 
             @Override
             public boolean finishComposingText() {
                 if (TERMINAL_VIEW_KEY_LOGGING_ENABLED) mClient.logInfo(LOG_TAG, "IME: finishComposingText()");
                 super.finishComposingText();
-                // Already in the terminal; nothing left to send.
-                mSent = "";
-                getEditable().clear();
-                return true;
+                return sync();
             }
 
             @Override
@@ -346,14 +359,7 @@ public final class TerminalView extends View {
                     mClient.logInfo(LOG_TAG, "IME: commitText(\"" + text + "\", " + newCursorPosition + ")");
                 }
                 super.commitText(text, newCursorPosition);
-
-                if (mEmulator == null) return true;
-
-                // Replaces whatever was being composed, which the terminal already has.
-                syncComposing(text);
-                mSent = "";
-                getEditable().clear();
-                return true;
+                return sync();
             }
 
             @Override
@@ -361,10 +367,19 @@ public final class TerminalView extends View {
                 if (TERMINAL_VIEW_KEY_LOGGING_ENABLED) {
                     mClient.logInfo(LOG_TAG, "IME: deleteSurroundingText(" + leftLength + ", " + rightLength + ")");
                 }
-                // The stock Samsung keyboard with 'Auto check spelling' enabled sends leftLength > 1.
-                KeyEvent deleteKey = new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL);
-                for (int i = 0; i < leftLength; i++) sendKeyEvent(deleteKey);
-                return super.deleteSurroundingText(leftLength, rightLength);
+                // With nothing typed on this line the editor is empty, but the shell may still have text to delete
+                // (a backspace after Enter, or after the extra keys); send those as plain backspaces.
+                int beforeCursor = Math.max(0, Selection.getSelectionStart(getEditable()));
+                for (int i = beforeCursor; i < leftLength; i++) mTermSession.writeCodePoint(false, 127);
+                super.deleteSurroundingText(leftLength, rightLength);
+                return sync();
+            }
+
+            @Override
+            public boolean replaceText(int start, int end, CharSequence text, int newCursorPosition,
+                                       android.view.inputmethod.TextAttribute textAttribute) {
+                super.replaceText(start, end, text, newCursorPosition, textAttribute);
+                return sync();
             }
 
             void sendTextToTerminal(CharSequence text) {
@@ -424,6 +439,16 @@ public final class TerminalView extends View {
             }
 
         };
+    }
+
+    /**
+     * PocketShell: start a fresh line for the keyboard. Called when something other than the keyboard's text reaches
+     * the terminal (Enter, arrows, the extra keys, a paste), since the keyboard's idea of the current line no
+     * longer matches the shell's.
+     */
+    public void resetKeyboardInput() {
+        InputMethodManager imm = (InputMethodManager) getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (imm != null) imm.restartInput(this);
     }
 
     @Override
@@ -742,6 +767,9 @@ public final class TerminalView extends View {
         if (isSelectingText()) {
             stopTextSelectionMode();
         }
+        // PocketShell: a key sent as a key rather than as text (Enter, Backspace on an empty line, a hardware
+        // keyboard) changes the line behind the keyboard's back.
+        resetKeyboardInput();
 
         if (mClient.onKeyDown(keyCode, event, mTermSession)) {
             invalidate();
