@@ -393,6 +393,8 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
     private fun refreshModifiers() {
         ctrlKey.background = keyBackground(ctrlLatched)
         altKey.background = keyBackground(altLatched)
+        // End any word the keyboard is composing, so ctrl-C doesn't become the start of a word it later revises.
+        getSystemService(InputMethodManager::class.java).restartInput(terminalView)
     }
 
     private fun showMenu(anchor: View) {
@@ -537,8 +539,8 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
 
     override fun shouldBackButtonBeMappedToEscape() = false
 
-    // Char-based input keeps IMEs from composing words, which a shell can't undo.
-    override fun shouldEnforceCharBasedInput() = true
+    // False lets keyboards compose words (swipe typing); TerminalView mirrors the composing text as it changes.
+    override fun shouldEnforceCharBasedInput() = false
 
     override fun shouldUseCtrlSpaceWorkaround() = false
 

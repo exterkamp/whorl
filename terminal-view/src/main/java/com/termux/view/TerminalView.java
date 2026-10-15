@@ -285,14 +285,10 @@ public final class TerminalView extends View {
                 // https://cs.android.com/android/platform/superproject/+/android-11.0.0_r40:packages/inputmethods/LatinIME/java/src/com/android/inputmethod/latin/InputAttributes.java;l=79
                 outAttrs.inputType = InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS;
             } else {
-                // Using InputType.NULL is the most correct input type and avoids issues with other hacks.
-                //
-                // Previous keyboard issues:
-                // https://github.com/termux/termux-packages/issues/25
-                // https://github.com/termux/termux-app/issues/87.
-                // https://github.com/termux/termux-app/issues/126.
-                // https://github.com/termux/termux-app/issues/137 (japanese chars and TYPE_NULL).
-                outAttrs.inputType = InputType.TYPE_NULL;
+                // PocketShell: a plain text field rather than Termux's TYPE_NULL, so keyboards offer swipe typing
+                // and suggestions. The IME's composing text is mirrored into the terminal as it changes (see
+                // syncComposing() below). Without the AUTO_CORRECT flag, keyboards leave typed words alone.
+                outAttrs.inputType = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_NORMAL;
             }
         } else {
             // Corresponds to android:inputType="text"
@@ -305,12 +301,41 @@ public final class TerminalView extends View {
 
         return new BaseInputConnection(this, true) {
 
+            /** The composing text the terminal has already been sent; it is revised with backspaces. */
+            private String mSent = "";
+
+            /**
+             * Bring what the terminal has of the word being composed up to date: backspace over where it differs
+             * from [text], then type the rest. So a swiped word appears at once, and picking a suggestion fixes it.
+             */
+            private void syncComposing(CharSequence text) {
+                String now = text.toString();
+                int common = 0;
+                int max = Math.min(now.length(), mSent.length());
+                while (common < max && now.charAt(common) == mSent.charAt(common)) common++;
+                if (common > 0 && Character.isHighSurrogate(now.charAt(common - 1))) common--;
+                int stale = mSent.codePointCount(common, mSent.length());
+                KeyEvent deleteKey = new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL);
+                for (int i = 0; i < stale; i++) sendKeyEvent(deleteKey);
+                sendTextToTerminal(now.substring(common));
+                mSent = now;
+            }
+
+            @Override
+            public boolean setComposingText(CharSequence text, int newCursorPosition) {
+                if (TERMINAL_VIEW_KEY_LOGGING_ENABLED) {
+                    mClient.logInfo(LOG_TAG, "IME: setComposingText(\"" + text + "\", " + newCursorPosition + ")");
+                }
+                if (mEmulator != null) syncComposing(text);
+                return super.setComposingText(text, newCursorPosition);
+            }
+
             @Override
             public boolean finishComposingText() {
                 if (TERMINAL_VIEW_KEY_LOGGING_ENABLED) mClient.logInfo(LOG_TAG, "IME: finishComposingText()");
                 super.finishComposingText();
-
-                sendTextToTerminal(getEditable());
+                // Already in the terminal; nothing left to send.
+                mSent = "";
                 getEditable().clear();
                 return true;
             }
@@ -324,9 +349,10 @@ public final class TerminalView extends View {
 
                 if (mEmulator == null) return true;
 
-                Editable content = getEditable();
-                sendTextToTerminal(content);
-                content.clear();
+                // Replaces whatever was being composed, which the terminal already has.
+                syncComposing(text);
+                mSent = "";
+                getEditable().clear();
                 return true;
             }
 
