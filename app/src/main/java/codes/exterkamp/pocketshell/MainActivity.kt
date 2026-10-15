@@ -8,11 +8,18 @@ import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
-import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -31,14 +38,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
@@ -56,12 +62,13 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -74,35 +81,86 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.concurrent.thread
 
+// A terminal's palette: phosphor green on black, amber for the second accent, square corners and one monospace
+// face everywhere, so the app reads like a TUI rather than a Material app.
 private val Colors = darkColorScheme(
-    primary = Color(0xFF7EE787),
-    onPrimary = Color(0xFF0E1116),
-    secondary = Color(0xFF79C0FF),
-    background = Color(0xFF0E1116),
-    onBackground = Color(0xFFE6EDF3),
-    surface = Color(0xFF0E1116),
-    onSurface = Color(0xFFE6EDF3),
-    secondaryContainer = Color(0xFF1F3B26),
-    onSecondaryContainer = Color(0xFF7EE787),
-    surfaceVariant = Color(0xFF161B22),
-    onSurfaceVariant = Color(0xFF8B949E),
-    surfaceContainer = Color(0xFF161B22),
-    surfaceContainerHigh = Color(0xFF1C2128),
-    surfaceContainerHighest = Color(0xFF21262D),
-    outline = Color(0xFF30363D),
-    error = Color(0xFFFF7B72),
+    primary = Color(0xFF00FF41),
+    onPrimary = Color(0xFF000000),
+    primaryContainer = Color(0xFF0B3D1A),
+    onPrimaryContainer = Color(0xFF00FF41),
+    secondary = Color(0xFFFFB000),
+    onSecondary = Color(0xFF000000),
+    background = Color(0xFF050805),
+    onBackground = Color(0xFFCFF5D6),
+    surface = Color(0xFF050805),
+    onSurface = Color(0xFFCFF5D6),
+    secondaryContainer = Color(0xFF0B3D1A),
+    onSecondaryContainer = Color(0xFF00FF41),
+    surfaceVariant = Color(0xFF0B120C),
+    onSurfaceVariant = Color(0xFF6F9A78),
+    surfaceContainer = Color(0xFF0B120C),
+    surfaceContainerLow = Color(0xFF080D08),
+    surfaceContainerHigh = Color(0xFF0E1710),
+    surfaceContainerHighest = Color(0xFF132016),
+    outline = Color(0xFF1F5A2E),
+    outlineVariant = Color(0xFF143D20),
+    error = Color(0xFFFF5F56),
 )
+
+private val Mono = FontFamily.Monospace
+
+private val TuiTypography = Typography().let { t ->
+    fun TextStyle.mono() = copy(fontFamily = Mono, letterSpacing = 0.sp)
+    Typography(
+        displayLarge = t.displayLarge.mono(), displayMedium = t.displayMedium.mono(), displaySmall = t.displaySmall.mono(),
+        headlineLarge = t.headlineLarge.mono(), headlineMedium = t.headlineMedium.mono(), headlineSmall = t.headlineSmall.mono(),
+        titleLarge = t.titleLarge.mono(), titleMedium = t.titleMedium.mono(), titleSmall = t.titleSmall.mono(),
+        bodyLarge = t.bodyLarge.mono(), bodyMedium = t.bodyMedium.mono(), bodySmall = t.bodySmall.mono(),
+        labelLarge = t.labelLarge.mono(), labelMedium = t.labelMedium.mono(), labelSmall = t.labelSmall.mono(),
+    )
+}
+
+private val TuiShapes = RoundedCornerShape(0.dp).let { square ->
+    Shapes(extraSmall = square, small = square, medium = square, large = square, extraLarge = square)
+}
+
+/** A screen title like a shell prompt's working directory, with a blinking block cursor. */
+@Composable
+private fun TuiTitle(path: String) {
+    val blink by rememberInfiniteTransition(label = "cursor").animateFloat(
+        initialValue = 1f, targetValue = 0f,
+        animationSpec = infiniteRepeatable(tween(530, easing = { if (it < 0.5f) 0f else 1f }), RepeatMode.Restart),
+        label = "cursor",
+    )
+    Text(
+        buildAnnotatedString {
+            withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) { append("~/") }
+            withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary)) { append(path) }
+            append(" ")
+            withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary.copy(alpha = blink))) { append("█") }
+        },
+        fontWeight = FontWeight.Bold,
+    )
+}
+
+/** "[ label ]", the way a TUI draws a button. */
+private fun bracket(label: String) = "[ $label ]"
 
 private sealed interface Screen {
     data object Hosts : Screen
@@ -130,7 +188,7 @@ class MainActivity : ComponentActivity() {
         val store = Store.get(this)
         Sessions.restore(this)
         setContent {
-            MaterialTheme(colorScheme = Colors) {
+            MaterialTheme(colorScheme = Colors, typography = TuiTypography, shapes = TuiShapes) {
                 App(store, resumes) { startActivity(TerminalActivity.intent(this, it)) }
             }
         }
@@ -200,7 +258,7 @@ private fun HostList(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Hosts", fontWeight = FontWeight.SemiBold) },
+                title = { TuiTitle("machines") },
                 actions = {
                     IconButton(onClick = onDeviceKey) { Icon(Icons.Default.Lock, "Device key") }
                     IconButton(onClick = onAbout) { Icon(Icons.Default.Info, "About") }
@@ -210,14 +268,14 @@ private fun HostList(
         },
         floatingActionButton = {
             FloatingActionButton(onClick = onAdd, containerColor = MaterialTheme.colorScheme.primary) {
-                Icon(Icons.Default.Add, "Add host")
+                Icon(Icons.Default.Add, "Add machine")
             }
         },
     ) { padding ->
         if (profiles.isEmpty()) {
             Box(Modifier.fillMaxSize().padding(padding).padding(32.dp), contentAlignment = Alignment.Center) {
                 Text(
-                    "No hosts yet.\nTap + to add one.",
+                    "no machines yet.\n\npress [+] to add one.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodyLarge,
                 )
@@ -233,7 +291,7 @@ private fun HostList(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             if (sessions.isNotEmpty()) {
-                item { SectionLabel("Sessions") }
+                item { SectionLabel("sessions") }
                 items(sessions, key = { "session-" + it.profile.id }) { session ->
                     SessionRow(
                         session = session,
@@ -241,25 +299,25 @@ private fun HostList(
                         onEnd = { Sessions.remove(context, session) },
                     )
                 }
-                item { SectionLabel("Hosts") }
+                item { SectionLabel("machines") }
             }
             items(profiles, key = { it.id }) { profile ->
                 val live = resumes >= 0 && sessions.any { it.profile.id == profile.id && !it.finished }
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RectangleShape,
+                    border = BorderStroke(1.dp, if (live) MaterialTheme.colorScheme.primary.copy(alpha = 0.6f) else MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
                         .combinedClickable(onClick = { onConnect(profile) }, onLongClick = { onEdit(profile) }),
                 ) {
                     Row(Modifier.padding(start = 16.dp, top = 14.dp, bottom = 14.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                         Box(
-                            Modifier.size(10.dp).clip(CircleShape).background(
+                            Modifier.size(8.dp).background(
                                 if (live) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
                             )
                         )
-                        Spacer(Modifier.width(14.dp))
+                        Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
                             Text(profile.label, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
                             Text(
@@ -274,14 +332,9 @@ private fun HostList(
                             )
                         }
                         Text(
-                            profile.protocol.name.lowercase(),
-                            fontFamily = FontFamily.Monospace,
+                            "[" + profile.protocol.name.lowercase() + "]",
                             fontSize = 12.sp,
                             color = if (profile.protocol == Protocol.MOSH) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-                                .padding(horizontal = 8.dp, vertical = 3.dp),
                         )
                         IconButton(onClick = { onEdit(profile) }) {
                             Icon(Icons.Default.Edit, "Edit", tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -293,14 +346,17 @@ private fun HostList(
     }
 }
 
+/** "── text ─────────", a rule with a label, the way a TUI separates sections. */
 @Composable
 private fun SectionLabel(text: String) {
-    Text(
-        text,
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = 4.dp, top = 8.dp),
-    )
+    Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            "── $text ",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Box(Modifier.weight(1f).height(1.dp).background(MaterialTheme.colorScheme.outlineVariant))
+    }
 }
 
 /** An open session: tap to go back to it, ✕ to end it. */
@@ -310,22 +366,22 @@ private fun SessionRow(session: ActiveSession, onResume: () -> Unit, onEnd: () -
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .border(1.dp, if (ended) MaterialTheme.colorScheme.outlineVariant else MaterialTheme.colorScheme.primary.copy(alpha = 0.6f))
             .clickable(onClick = onResume)
             .padding(start = 16.dp, top = 6.dp, bottom = 6.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            Modifier.size(10.dp).clip(CircleShape).background(
+            Modifier.size(8.dp).background(
                 if (ended) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.primary
             )
         )
-        Spacer(Modifier.width(14.dp))
+        Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(session.profile.label, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
             Text(
-                (if (ended) "ended · tap to reconnect" else "connected · tap to resume") +
+                (if (ended) "ended · tap to reconnect" else "connected" + (session.route?.let { " via ${it.via}" } ?: "") + " · tap to resume") +
                     " · " + session.profile.protocol.name.lowercase(),
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -366,7 +422,7 @@ private fun EditHost(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (isNew) "New machine" else "Edit machine") },
+                title = { TuiTitle(if (isNew) "machines/new" else "machines/" + initial.label) },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
                 actions = {
                     if (!isNew) IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Default.Delete, "Delete") }
@@ -380,7 +436,7 @@ private fun EditHost(
                                 startup = startup.trim(),
                             )
                         )
-                    }) { Text("Save") }
+                    }) { Text(bracket("save")) }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
             )
@@ -419,7 +475,7 @@ private fun EditHost(
                     }
                 }
             }
-            TextButton(onClick = { addresses.add("") }) { Text("+ Add address") }
+            TextButton(onClick = { addresses.add("") }) { Text(bracket("+ address")) }
             Text(
                 "Add each way to reach this machine, e.g. its LAN address and its Tailscale one. All are tried on " +
                     "connect and the first to answer is used, preferring the ones listed first. If the network " +
@@ -474,8 +530,8 @@ private fun EditHost(
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
             title = { Text("Delete ${initial.label}?") },
-            confirmButton = { TextButton(onClick = { onDelete(initial) }) { Text("Delete") } },
-            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } },
+            confirmButton = { TextButton(onClick = { onDelete(initial) }) { Text(bracket("delete")) } },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(bracket("cancel")) } },
         )
     }
 }
@@ -507,7 +563,7 @@ private fun DeviceKey(store: Store, onBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Device key") },
+                title = { TuiTitle("device-key") },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
             )
@@ -518,7 +574,7 @@ private fun DeviceKey(store: Store, onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Text(
-                "Hosts set to \"Device key\" sign in with this key. Add the public half to ~/.ssh/authorized_keys on each machine.",
+                "Machines set to \"Device key\" sign in with this key. Add the public half to ~/.ssh/authorized_keys on each machine.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             val key = publicKey
@@ -529,22 +585,22 @@ private fun DeviceKey(store: Store, onBack: () -> Unit) {
                     fontSize = 12.sp,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant)
                         .padding(12.dp),
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Button(onClick = {
                         context.getSystemService(ClipboardManager::class.java)
                             .setPrimaryClip(ClipData.newPlainText("public key", key))
-                    }) { Text("Copy") }
+                    }) { Text(bracket("copy")) }
                     OutlinedButton(onClick = {
                         context.startActivity(
                             Intent.createChooser(
                                 Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, key), null
                             )
                         )
-                    }) { Text("Share") }
+                    }) { Text(bracket("share")) }
                 }
             } else {
                 Text("No key yet.", style = MaterialTheme.typography.titleMedium)
@@ -555,8 +611,8 @@ private fun DeviceKey(store: Store, onBack: () -> Unit) {
                 OutlinedButton(enabled = !busy, onClick = {
                     val generate = { run { Ssh.generateDeviceKey(context) } }
                     if (key != null) confirmReplace = generate else generate()
-                }) { Text(if (key == null) "Generate key" else "New key") }
-                OutlinedButton(enabled = !busy, onClick = { importing = !importing }) { Text("Import key") }
+                }) { Text(bracket(if (key == null) "generate" else "new key")) }
+                OutlinedButton(enabled = !busy, onClick = { importing = !importing }) { Text(bracket("import")) }
             }
 
             if (importing) {
@@ -583,7 +639,7 @@ private fun DeviceKey(store: Store, onBack: () -> Unit) {
                 Button(enabled = !busy && privateKey.isNotBlank(), onClick = {
                     val import = { run { Ssh.importDeviceKey(context, privateKey, passphrase) } }
                     if (key != null) confirmReplace = import else import()
-                }) { Text("Use this key") }
+                }) { Text(bracket("use this key")) }
             }
 
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
@@ -594,9 +650,9 @@ private fun DeviceKey(store: Store, onBack: () -> Unit) {
         AlertDialog(
             onDismissRequest = { confirmReplace = null },
             title = { Text("Replace the device key?") },
-            text = { Text("Hosts that only trust the current key will stop accepting this device until you add the new one.") },
-            confirmButton = { TextButton(onClick = { confirmReplace = null; action() }) { Text("Replace") } },
-            dismissButton = { TextButton(onClick = { confirmReplace = null }) { Text("Cancel") } },
+            text = { Text("Machines that only trust the current key will stop accepting this device until you add the new one.") },
+            confirmButton = { TextButton(onClick = { confirmReplace = null; action() }) { Text(bracket("replace")) } },
+            dismissButton = { TextButton(onClick = { confirmReplace = null }) { Text(bracket("cancel")) } },
         )
     }
 }
@@ -614,7 +670,7 @@ private fun About(onBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (showLicenses) "Open source licenses" else "About") },
+                title = { TuiTitle(if (showLicenses) "about/licenses" else "about") },
                 navigationIcon = {
                     IconButton(onClick = { if (showLicenses) showLicenses = false else onBack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
@@ -645,9 +701,9 @@ private fun About(onBack: () -> Unit) {
                     "hosts you add, and your hosts, passwords and keys stay encrypted on this device.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            OutlinedButton(onClick = { open(PRIVACY_URL) }) { Text("Privacy policy") }
-            OutlinedButton(onClick = { open(SOURCE_URL) }) { Text("Source code") }
-            OutlinedButton(onClick = { showLicenses = true }) { Text("Open source licenses") }
+            OutlinedButton(onClick = { open(PRIVACY_URL) }) { Text(bracket("privacy policy")) }
+            OutlinedButton(onClick = { open(SOURCE_URL) }) { Text(bracket("source code")) }
+            OutlinedButton(onClick = { showLicenses = true }) { Text(bracket("open source licenses")) }
             ExterwareMark(Modifier.fillMaxWidth().padding(top = 24.dp))
         }
     }
@@ -711,7 +767,7 @@ private fun <T> Choice(options: List<Pair<String, T>>, selected: T, onSelect: (T
             SegmentedButton(
                 selected = value == selected,
                 onClick = { onSelect(value) },
-                shape = SegmentedButtonDefaults.itemShape(i, options.size),
+                shape = RectangleShape,
             ) { Text(label) }
         }
     }

@@ -167,6 +167,7 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
         setPadding(dp(4), 0, dp(4), 0)
 
         fun iconButton(label: String, description: String, onTap: () -> Unit) = TextView(context).apply {
+            typeface = Typeface.MONOSPACE
             text = label
             contentDescription = description
             setTextColor(MUTED)
@@ -178,7 +179,7 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
         }
 
         // Home: back to the host list, leaving this session running.
-        addView(iconButton("⌂", "Hosts") { finish() })
+        addView(iconButton("⌂", "Machines") { finish() })
 
         // The current session; tap to switch between sessions.
         addView(LinearLayout(context).apply {
@@ -186,10 +187,11 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(8), dp(8), dp(8), dp(8))
             sessionDot = View(context).apply {
-                background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(ACCENT) }
+                background = GradientDrawable().apply { setColor(ACCENT) }
             }
             addView(sessionDot, LinearLayout.LayoutParams(dp(8), dp(8)).apply { marginEnd = dp(10) })
             sessionTitle = TextView(context).apply {
+                typeface = Typeface.MONOSPACE
                 setTextColor(FOREGROUND)
                 textSize = 15f
                 maxLines = 1
@@ -197,6 +199,7 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
             }
             addView(sessionTitle, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
             addView(TextView(context).apply {
+                typeface = Typeface.MONOSPACE
                 text = "▾"
                 setTextColor(MUTED)
                 setPadding(dp(8), 0, 0, 0)
@@ -251,6 +254,7 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
             setPadding(dp(4), dp(4), dp(4), dp(4))
         }
         fun key(label: String, onTap: (View) -> Unit): TextView = TextView(this).apply {
+            typeface = Typeface.MONOSPACE
             text = label
             setTextColor(FOREGROUND)
             textSize = 15f
@@ -316,17 +320,19 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
         setBackgroundColor(BAR)
         setPadding(dp(16), dp(8), dp(8), dp(8))
         addView(TextView(context).apply {
-            text = "Disconnected"
+            typeface = Typeface.MONOSPACE
+            text = "-- disconnected --"
             setTextColor(FOREGROUND)
         }, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
         fun button(label: String, onTap: () -> Unit) = addView(TextView(context).apply {
+            typeface = Typeface.MONOSPACE
             text = label
             setTextColor(ACCENT)
             setPadding(dp(12), dp(10), dp(12), dp(10))
             setOnClickListener { onTap() }
         })
-        button("Reconnect") { Sessions.reconnect(this@TerminalActivity, session, automatic = false) }
-        button("Close") { endSession() }
+        button("[ reconnect ]") { Sessions.reconnect(this@TerminalActivity, session, automatic = false) }
+        button("[ close ]") { endSession() }
     }
 
     private fun showEnded(ended: Boolean) {
@@ -521,9 +527,10 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
 
     // ---- helpers ------------------------------------------------------------------------------------------------
 
+    /** Square keys outlined like a TUI's buttons; a latched modifier lights up. */
     private fun keyBackground(active: Boolean) = GradientDrawable().apply {
-        cornerRadius = dp(6).toFloat()
         setColor(if (active) ACCENT_DIM else KEY)
+        setStroke(dp(1), if (active) ACCENT else KEY_BORDER)
     }
 
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
@@ -534,13 +541,15 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
     companion object {
         private const val EXTRA_PROFILE = "profile"
 
-        private val BACKGROUND = Color.parseColor("#0E1116")
-        private val BAR = Color.parseColor("#161B22")
-        private val KEY = Color.parseColor("#21262D")
-        private val FOREGROUND = Color.parseColor("#E6EDF3")
-        private val MUTED = Color.parseColor("#8B949E")
-        private val ACCENT = Color.parseColor("#7EE787")
-        private val ACCENT_DIM = Color.parseColor("#2EA043")
+        // The same phosphor palette as the rest of the app (MainActivity's Colors).
+        private val BACKGROUND = Color.parseColor("#050805")
+        private val BAR = Color.parseColor("#0B120C")
+        private val KEY = Color.parseColor("#0B120C")
+        private val KEY_BORDER = Color.parseColor("#1F5A2E")
+        private val FOREGROUND = Color.parseColor("#CFF5D6")
+        private val MUTED = Color.parseColor("#6F9A78")
+        private val ACCENT = Color.parseColor("#00FF41")
+        private val ACCENT_DIM = Color.parseColor("#0B3D1A")
 
         fun intent(context: Context, profile: Profile) =
             Intent(context, TerminalActivity::class.java).putExtra(EXTRA_PROFILE, profile.id)
