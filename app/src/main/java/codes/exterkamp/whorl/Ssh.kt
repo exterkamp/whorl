@@ -239,7 +239,8 @@ private class PromptingUserInfo(
 
     override fun promptYesNo(message: String): Boolean {
         if (rejectChangedKey && message.contains("IDENTIFICATION HAS CHANGED", ignoreCase = true)) return false
-        return prompter.yesNo("Host key", message)
+        // JSch names the host by its known_hosts alias, an internal id; show the machine's name instead.
+        return prompter.yesNo("Host key", message.replace(profile.hostKeyAlias, profile.label))
     }
 
     override fun showMessage(message: String) = prompter.status(message)

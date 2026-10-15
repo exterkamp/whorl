@@ -8,5 +8,9 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-ins
       libxkbcommon0 libxkbcommon-x11-0 \
     && rm -rf /var/lib/apt/lists/*
 RUN sdkmanager "emulator" "system-images;android-36;google_apis;x86_64" >/dev/null \
-    && echo no | avdmanager create avd -n test -k "system-images;android-36;google_apis;x86_64" -d pixel_6 >/dev/null
+    && echo no | avdmanager create avd -n test -k "system-images;android-36;google_apis;x86_64" -d pixel_6 >/dev/null \
+    && cfg=$(find / -path '*avd/test.avd/config.ini' 2>/dev/null | head -1) \
+    && sed -i '/^hw.lcd.\(width\|height\|density\)=/d; /^skin\./d' "$cfg" \
+    && printf 'hw.lcd.width=1080\nhw.lcd.height=2160\nhw.lcd.density=420\nskin.dynamic=yes\nhw.keyboard=no\n' >> "$cfg"
+# 1080x2160: Play's phone screenshots may be no taller than twice their width, which a Pixel 6 (2400) is.
 ENV PATH=$PATH:/opt/android-sdk/emulator

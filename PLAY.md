@@ -86,7 +86,10 @@ login to the app is required."
 In `play/` (regenerate with `play/make-graphics.sh`):
 - `icon-512.png`: 512×512 app icon
 - `feature-1024x500.png`: feature graphic
-- `screenshots/*.png`: phone screenshots, 1080×2160 (Play requires an aspect ratio of 2:1 or less)
+- `screenshots/*.png`: phone screenshots, 1080×2160 (Play requires an aspect ratio of 2:1 or less), upload in
+  file-name order. Taken from the app on the `docker/Dockerfile.emulator` emulator (set to 1080×2160) against
+  `docker/test-server`, with the status bar in SystemUI demo mode (12:00, full battery). The emulator image is
+  about 9GB and needs about 7GB free to boot.
 
 ## Testing tracks
 

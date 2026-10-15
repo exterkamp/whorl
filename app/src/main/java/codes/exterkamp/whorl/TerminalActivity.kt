@@ -129,7 +129,11 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
                 WindowInsetsCompat.CONSUMED
             }
             addView(buildHeader(), LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
-            addView(terminalView, LinearLayout.LayoutParams(MATCH_PARENT, 0, 1f))
+            // A little room at the sides so text doesn't touch the screen edge.
+            addView(terminalView, LinearLayout.LayoutParams(MATCH_PARENT, 0, 1f).apply {
+                marginStart = dp(6)
+                marginEnd = dp(6)
+            })
             addView(endedBar, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
             addView(keysBar, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         })
