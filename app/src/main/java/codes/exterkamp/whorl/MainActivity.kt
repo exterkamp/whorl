@@ -708,7 +708,7 @@ internal fun About(onBack: () -> Unit) {
             Spacer(Modifier.height(16.dp))
             Text("Whorl", style = MaterialTheme.typography.headlineMedium)
             if (version.isNotEmpty()) {
-                Text("Version $version", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Version $version · ${BuildConfig.GIT_COMMIT}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Text(
                 "A plain SSH and mosh client. No accounts, no analytics, no ads. Whorl only talks to the machines " +

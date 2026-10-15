@@ -9,6 +9,10 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+# Shown on the About screen, so two phones can be told apart when builds share a version number.
+GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)
+git diff --quiet HEAD 2>/dev/null || GIT_COMMIT="$GIT_COMMIT+"
+
 docker image inspect pocketshell-toolchain >/dev/null 2>&1 || docker build -t pocketshell-toolchain docker/
 
 # Keep the Gradle cache and the debug signing key on the host so builds are incremental and
@@ -29,5 +33,6 @@ docker run --rm --memory 6g \
   ${SIGNING_DIR:+-v "$SIGNING_DIR:/signing:ro" -e POCKETSHELL_SIGNING=/signing/keystore.properties} \
   -v "$PWD:/work" -w /work \
   ${TEST_SSH_HOST:+-e TEST_SSH_HOST="$TEST_SSH_HOST"} \
+  -e GIT_COMMIT="$GIT_COMMIT" \
   pocketshell-toolchain \
   gradle --no-daemon --console=plain "${@:-assembleDebug}"

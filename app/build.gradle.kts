@@ -24,6 +24,8 @@ android {
         targetSdk = 36
         versionCode = 3
         versionName = "0.3.0"
+        // The commit this was built from, set by build.sh; "+" means uncommitted changes.
+        buildConfigField("String", "GIT_COMMIT", "\"${System.getenv("GIT_COMMIT") ?: "dev"}\"")
         ndk {
             // mosh-client is only built for arm64.
             abiFilters += "arm64-v8a"
@@ -65,6 +67,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
