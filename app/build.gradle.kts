@@ -22,8 +22,8 @@ android {
         applicationId = "codes.exterkamp.whorl"
         minSdk = 26
         targetSdk = 36
-        versionCode = 5
-        versionName = "0.4.1"
+        versionCode = 6
+        versionName = "0.4.2"
         // The commit this was built from, set by build.sh; "+" means uncommitted changes.
         buildConfigField("String", "GIT_COMMIT", "\"${System.getenv("GIT_COMMIT") ?: "dev"}\"")
         ndk {
