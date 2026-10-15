@@ -224,7 +224,16 @@ object Sessions {
         }
         override fun onCopyTextToClipboard(s: TerminalSession, text: String) { active.listener?.onCopyTextToClipboard(s, text) }
         override fun onPasteTextFromClipboard(s: TerminalSession?) { active.listener?.onPasteTextFromClipboard(s) }
-        override fun onBell(s: TerminalSession) { active.listener?.onBell(s) }
+        // With the session on screen a bell just buzzes; otherwise it, and any notification a program asks for,
+        // becomes an Android notification.
+        override fun onBell(s: TerminalSession) {
+            val listener = active.listener
+            if (listener != null) listener.onBell(s)
+            else if (active.replacedBy == null) Alerts.post(app, active, title = null, body = null)
+        }
+        override fun onNotification(s: TerminalSession, title: String?, body: String?) {
+            if (active.listener == null && active.replacedBy == null) Alerts.post(app, active, title, body)
+        }
         override fun onColorsChanged(s: TerminalSession) { active.listener?.onColorsChanged(s) }
         override fun onTerminalCursorStateChange(state: Boolean) { active.listener?.onTerminalCursorStateChange(state) }
         override fun getTerminalCursorStyle(): Int? = null

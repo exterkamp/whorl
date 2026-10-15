@@ -1981,6 +1981,23 @@ public final class TerminalEmulator {
                     }
                 }
                 break;
+            case 9: // PocketShell: iTerm2's "OSC 9 ; message" notification. ConEmu's "9;4;..." progress codes aren't one.
+                if (!textParameter.matches("^\\d+;.*") && !textParameter.isEmpty()) mSession.onNotification(null, textParameter);
+                break;
+            case 777: // PocketShell: rxvt's "OSC 777 ; notify ; title ; body", as Ghostty and others send.
+                if (textParameter.startsWith("notify;")) {
+                    String rest = textParameter.substring("notify;".length());
+                    int semi = rest.indexOf(';');
+                    if (semi < 0) mSession.onNotification(null, rest);
+                    else mSession.onNotification(rest.substring(0, semi), rest.substring(semi + 1));
+                }
+                break;
+            case 99: { // PocketShell: kitty's "OSC 99 ; metadata ; payload". Only the simple one-part form.
+                int semi = textParameter.indexOf(';');
+                String payload = semi < 0 ? "" : textParameter.substring(semi + 1);
+                if (!payload.isEmpty()) mSession.onNotification(null, payload);
+                break;
+            }
             case 52: // Manipulate Selection Data. Skip the optional first selection parameter(s).
                 int startIndex = textParameter.indexOf(";") + 1;
                 try {

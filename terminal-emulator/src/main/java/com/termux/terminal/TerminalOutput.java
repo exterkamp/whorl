@@ -29,4 +29,7 @@ public abstract class TerminalOutput {
 
     public abstract void onColorsChanged();
 
+    /** PocketShell: the program asked for a desktop notification (OSC 9, 777 or 99). [title] may be null. */
+    public void onNotification(String title, String body) {}
+
 }

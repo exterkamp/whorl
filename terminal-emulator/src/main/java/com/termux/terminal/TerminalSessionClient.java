@@ -19,6 +19,9 @@ public interface TerminalSessionClient {
 
     void onBell(TerminalSession session);
 
+    /** PocketShell: the program asked for a desktop notification (OSC 9, 777 or 99). [title] may be null. */
+    default void onNotification(TerminalSession session, String title, String body) {}
+
     void onColorsChanged(TerminalSession session);
 
     void onTerminalCursorStateChange(boolean state);

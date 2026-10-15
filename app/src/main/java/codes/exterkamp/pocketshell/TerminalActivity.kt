@@ -133,6 +133,7 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
         showEnded(active.finished)
         refreshHeader()
         if (!isPaused) bindListeners()
+        Alerts.clear(this, active.profile.id)
         terminalView.requestFocus()
         terminalView.post { showKeyboard() }
     }
@@ -147,6 +148,7 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
         while (true) current = current.replacedBy ?: break
         if (current !== session) attach(current)
         bindListeners()
+        Alerts.clear(this, session.profile.id)
         // Catch up on anything that arrived while we weren't listening.
         terminalView.onScreenUpdated()
         showEnded(session.finished)
