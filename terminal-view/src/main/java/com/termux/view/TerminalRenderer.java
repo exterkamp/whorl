@@ -66,8 +66,10 @@ public final class TerminalRenderer {
         final int[] palette = mEmulator.mColors.mCurrentColors;
         final int cursorShape = mEmulator.getCursorStyle();
 
-        if (reverseVideo)
-            canvas.drawColor(palette[TextStyle.COLOR_INDEX_FOREGROUND], PorterDuff.Mode.SRC);
+        // PocketShell: paint the terminal's own default background over the whole view, rather than relying on the
+        // view's background, so a program that changes it (OSC 11) gets it everywhere.
+        final int canvasColor = palette[reverseVideo ? TextStyle.COLOR_INDEX_FOREGROUND : TextStyle.COLOR_INDEX_BACKGROUND];
+        canvas.drawColor(canvasColor, PorterDuff.Mode.SRC);
 
         float heightOffset = mFontLineSpacingAndAscent;
         for (int row = topRow; row < endRow; row++) {
@@ -154,6 +156,56 @@ public final class TerminalRenderer {
             drawTextRun(canvas, line, palette, heightOffset, lastRunStartColumn, columnWidthSinceLastRun, lastRunStartIndex, charsSinceLastRun,
                 measuredWidthForRun, cursorColor, cursorShape, lastRunStyle, reverseVideo || invertCursorTextColor || lastRunInsideSelection);
         }
+
+        drawEdges(mEmulator, canvas, topRow, palette, reverseVideo, canvasColor);
+    }
+
+    /**
+     * PocketShell: the view is rarely a whole number of cells, which leaves strips past the last column, above the
+     * first row and below the last. Paint them in the background of the cells beside them, so a program's colored
+     * backgrounds (herdr's panes, a status bar) run to the edges of the screen instead of stopping short.
+     */
+    private void drawEdges(TerminalEmulator emulator, Canvas canvas, int topRow, int[] palette, boolean reverseVideo,
+                           int canvasColor) {
+        final TerminalBuffer screen = emulator.getScreen();
+        final int rows = emulator.mRows;
+        final int columns = emulator.mColumns;
+        final float width = canvas.getWidth();
+        final float height = canvas.getHeight();
+        final float gridTop = mFontLineSpacingAndAscent;
+        final float gridBottom = gridTop + rows * mFontLineSpacing;
+        final float gridRight = columns * mFontWidth;
+        for (int i = 0; i < rows; i++) {
+            TerminalRow row = screen.allocateFullLineIfNecessary(screen.externalToInternalRow(topRow + i));
+            float rowTop = i == 0 ? 0 : gridTop + i * mFontLineSpacing;
+            float rowBottom = i == rows - 1 ? height : gridTop + (i + 1) * mFontLineSpacing;
+            if (width > gridRight) fillEdge(canvas, cellBackground(row, columns - 1, palette, reverseVideo),
+                canvasColor, gridRight, rowTop, width, rowBottom);
+            if (i != 0 && i != rows - 1) continue;
+            for (int column = 0; column < columns; column++) {
+                int color = cellBackground(row, column, palette, reverseVideo);
+                float left = column * mFontWidth;
+                if (i == 0) fillEdge(canvas, color, canvasColor, left, 0, left + mFontWidth, gridTop);
+                if (i == rows - 1) fillEdge(canvas, color, canvasColor, left, gridBottom, left + mFontWidth, height);
+            }
+        }
+    }
+
+    private void fillEdge(Canvas canvas, int color, int canvasColor, float left, float top, float right, float bottom) {
+        if (color == canvasColor || right <= left || bottom <= top) return;
+        mTextPaint.setColor(color);
+        canvas.drawRect(left, top, right, bottom, mTextPaint);
+    }
+
+    /** The background a cell is drawn with, as drawTextRun() works it out (ignoring the cursor and selection). */
+    private static int cellBackground(TerminalRow row, int column, int[] palette, boolean reverseVideo) {
+        long style = row.getStyle(column);
+        int fore = TextStyle.decodeForeColor(style);
+        int back = TextStyle.decodeBackColor(style);
+        if ((fore & 0xff000000) != 0xff000000) fore = palette[fore];
+        if ((back & 0xff000000) != 0xff000000) back = palette[back];
+        boolean inverse = reverseVideo ^ (TextStyle.decodeEffect(style) & TextStyle.CHARACTER_ATTRIBUTE_INVERSE) != 0;
+        return inverse ? fore : back;
     }
 
     private void drawTextRun(Canvas canvas, char[] text, int[] palette, float y, int startColumn, int runWidthColumns,
