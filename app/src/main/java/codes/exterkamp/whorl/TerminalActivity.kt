@@ -96,8 +96,7 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
 
         fontSize = store.fontSize.takeIf { it > 0 } ?: sp(13f)
 
-        // The terminal's colors follow light and dark; sessions already open take the new ones too.
-        if (TerminalTheme.apply(this)) Sessions.all().forEach { it.terminal.emulator?.mColors?.reset() }
+        applyTerminalColors()
         WindowCompat.getInsetsController(window, window.decorView).apply {
             isAppearanceLightStatusBars = !isDark(this@TerminalActivity)
             isAppearanceLightNavigationBars = !isDark(this@TerminalActivity)
@@ -448,6 +447,15 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
             menu.add("Paste").setOnMenuItemClickListener { paste(); true }
             menu.add("Bigger text").setOnMenuItemClickListener { changeFontSize(+1); true }
             menu.add("Smaller text").setOnMenuItemClickListener { changeFontSize(-1); true }
+            menu.add("Light terminal in light mode").apply {
+                isCheckable = true
+                isChecked = store.terminalFollowsSystem
+                setOnMenuItemClickListener {
+                    store.terminalFollowsSystem = !store.terminalFollowsSystem
+                    applyTerminalColors()
+                    true
+                }
+            }
             menu.add("Disconnect").setOnMenuItemClickListener { endSession(); true }
             show()
         }
@@ -481,6 +489,14 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
     private fun showEnded(ended: Boolean) {
         endedBar.visibility = if (ended) View.VISIBLE else View.GONE
         keysBar.visibility = if (ended) View.GONE else View.VISIBLE
+    }
+
+    /** Dark, or light in light mode if the user chose that; sessions already open take the new colors too. */
+    private fun applyTerminalColors() {
+        if (TerminalTheme.apply(this)) {
+            Sessions.all().forEach { it.terminal.emulator?.mColors?.reset() }
+            if (::terminalView.isInitialized) terminalView.invalidate()
+        }
     }
 
     private fun changeFontSize(direction: Int) {

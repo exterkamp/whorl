@@ -75,13 +75,17 @@ fun WhorlTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composable () ->
 }
 
 /**
- * The terminal follows the app: its background and text are the theme's surface colors, and the 16 ANSI colors
- * are a set that stays readable on that background (GitHub's, light or dark). Programs can still set their own.
+ * The terminal's colors: its background and text are the dark theme's surface colors, and the 16 ANSI colors a set
+ * that stays readable on that background (GitHub's). Dark even in light mode by default, since most TUIs (herdr,
+ * Claude Code) draw for a dark terminal and leave the rest to its background; [Store.terminalFollowsSystem] turns
+ * it light in light mode. Programs can still set their own.
  */
 object TerminalTheme {
     private var applied: Pair<Boolean, Int>? = null
 
-    /** Set the default terminal colors for the current theme. True if they changed. */
+    fun isDark(context: Context) = !Store.get(context).terminalFollowsSystem || codes.exterkamp.whorl.isDark(context)
+
+    /** Set the default terminal colors for the current theme and setting. True if they changed. */
     fun apply(context: Context): Boolean {
         val dark = isDark(context)
         val colors = appColors(context, dark)

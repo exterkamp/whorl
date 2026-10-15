@@ -33,8 +33,9 @@ extra-keys row. No accounts, no sign-in, no paid tier, and no network traffic ex
   new one started; with a multiplexer as the run-on-connect command you land back where you were.
 - **Links:** long-press a URL for Open / Copy. It works on URLs that wrap across rows, including inside herdr
   and tmux panes. Long-press anywhere else selects text.
-- **Look:** Material 3, in your wallpaper's colors on Android 12 and later; light and dark follow the system,
-  the terminal included.
+- **Look:** Material 3, in your wallpaper's colors on Android 12 and later; light and dark follow the system.
+  The terminal stays dark either way, since herdr, Claude Code and most TUIs draw for a dark terminal; **⋮ →
+  Light terminal in light mode** changes that.
 
 ### Mosh
 
@@ -42,6 +43,8 @@ The app signs in over SSH, runs `mosh-server new …` on the server, and hands t
 `mosh-client`. The server needs mosh installed and UDP 60000–61000 reachable. The default **mosh-server
 command** looks in `~/.local/bin`, `/opt/homebrew/bin` and `/usr/local/bin` before the system PATH, since a
 non-interactive SSH login usually has none of them. If `mosh-server` is anywhere else, put its full path there.
+It also sets `MOSH_SERVER_NETWORK_TMOUT=86400`, so a server that hasn't heard from the phone for a day exits rather
+than lingering; a new mosh-client can't take over an old server anyway, and the app reconnects with a fresh one.
 
 mosh-server older than 1.4.0 (Ubuntu 20.04 ships 1.3.2) mangles 24-bit color, which shows up as dark text in
 Claude Code under herdr or tmux. `native/build-mosh-server-host.sh` builds a static 1.4.0 server. Install it as

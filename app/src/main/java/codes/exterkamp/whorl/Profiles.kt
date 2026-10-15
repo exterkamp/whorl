@@ -93,12 +93,20 @@ data class Profile(
          * Looks in ~/.local/bin and Homebrew's prefixes before the system PATH. A non-interactive SSH command
          * usually has neither on its PATH, and ~/.local/bin is where a newer mosh-server goes without root:
          * anything older than 1.4.0 mangles 24-bit color (see native/README.md).
+         *
+         * MOSH_SERVER_NETWORK_TMOUT makes a server that hasn't heard from its client for a day exit, so one left
+         * behind (the app uninstalled, the phone lost) doesn't run forever. A new client can't take over an old
+         * server anyway; the app reconnects with a fresh one.
          */
         const val DEFAULT_MOSH_SERVER =
-            "PATH=\"\$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:\$PATH\" mosh-server new -s -c 256 -l LANG=en_US.UTF-8"
+            "PATH=\"\$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:\$PATH\" MOSH_SERVER_NETWORK_TMOUT=86400 " +
+                "mosh-server new -s -c 256 -l LANG=en_US.UTF-8"
 
-        /** Saved by versions before 0.2.0; moved to the current default on load. */
-        private const val OLD_DEFAULT_MOSH_SERVER = "mosh-server new -s -c 256 -l LANG=en_US.UTF-8"
+        /** Earlier defaults, moved to the current one on load. */
+        private val OLD_DEFAULT_MOSH_SERVERS = setOf(
+            "mosh-server new -s -c 256 -l LANG=en_US.UTF-8",
+            "PATH=\"\$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:\$PATH\" mosh-server new -s -c 256 -l LANG=en_US.UTF-8",
+        )
 
         fun fromJson(o: JSONObject) = Profile(
             id = o.getString("id"),
@@ -112,7 +120,7 @@ data class Profile(
             auth = AuthMethod.valueOf(o.optString("auth", AuthMethod.DEVICE_KEY.name)),
             password = o.optString("password"),
             moshServer = o.optString("moshServer")
-                .takeUnless { it.isBlank() || it == OLD_DEFAULT_MOSH_SERVER } ?: DEFAULT_MOSH_SERVER,
+                .takeUnless { it.isBlank() || it in OLD_DEFAULT_MOSH_SERVERS } ?: DEFAULT_MOSH_SERVER,
             startup = o.optString("startup"),
         )
     }
@@ -168,11 +176,17 @@ class Store private constructor(private val prefs: SharedPreferences) {
         get() = prefs.getInt(KEY_FONT_SIZE, 0)
         set(value) = prefs.edit().putInt(KEY_FONT_SIZE, value).apply()
 
+    /** The terminal goes light in light mode too. Off by default: most TUIs (herdr, Claude Code) assume dark. */
+    var terminalFollowsSystem: Boolean
+        get() = prefs.getBoolean(KEY_TERMINAL_FOLLOWS_SYSTEM, false)
+        set(value) = prefs.edit().putBoolean(KEY_TERMINAL_FOLLOWS_SYSTEM, value).apply()
+
     companion object {
         private const val KEY_PROFILES = "profiles"
         private const val KEY_DEVICE_KEY = "device_key"
         private const val KEY_DEVICE_PUBLIC_KEY = "device_public_key"
         private const val KEY_FONT_SIZE = "font_size"
+        private const val KEY_TERMINAL_FOLLOWS_SYSTEM = "terminal_follows_system"
         private const val KEY_OPEN_SESSIONS = "open_sessions"
         private const val KEY_MOSH_PID = "mosh_pid:"
 
