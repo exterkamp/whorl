@@ -1,10 +1,10 @@
-package codes.exterkamp.pocketshell
+package codes.exterkamp.exterm
 
 import android.app.Application
 import com.termux.terminal.TerminalColors
 import java.util.Properties
 
-class PocketShell : Application() {
+class ExtermApp : Application() {
     override fun onCreate() {
         super.onCreate()
         // A dark palette that matches the app chrome; programs can still override colors with escape sequences.

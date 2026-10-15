@@ -1,10 +1,10 @@
-PocketShell is built from these open source components.
+exterm is built from these open source components.
 
 ========================================================================
 mosh-client 1.4.0
 License: GNU General Public License v3, with an exception permitting linking with OpenSSL
-PocketShell runs mosh-client as a separate program. Its complete corresponding source, with the build
-script and the one-line patch used for Android (native/build-mosh.sh), is in the PocketShell repository:
+exterm runs mosh-client as a separate program. Its complete corresponding source, with the build
+script and the one-line patch used for Android (native/build-mosh.sh), is in the exterm repository:
 https://github.com/exterkamp/pocketshell
 Upstream: https://mosh.org
 
@@ -947,7 +947,7 @@ https://github.com/termux/termux-app
 terminal-emulator and terminal-view are copied from termux-app v0.118.0
 (https://github.com/termux/termux-app), which carries them under the Apache
 License 2.0 as a derivative of jackpal's Android-Terminal-Emulator.
-Modified for pocketshell: TerminalSession runs over a pluggable TerminalTransport
+Modified for exterm: TerminalSession runs over a pluggable TerminalTransport
 (local pty process or a remote SSH channel) instead of always spawning a process.
 
 ========================================================================

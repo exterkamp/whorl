@@ -1,4 +1,4 @@
-package codes.exterkamp.pocketshell
+package codes.exterkamp.exterm
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull

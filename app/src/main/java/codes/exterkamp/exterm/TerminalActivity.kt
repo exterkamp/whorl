@@ -1,4 +1,4 @@
-package codes.exterkamp.pocketshell
+package codes.exterkamp.exterm
 
 import android.annotation.SuppressLint
 import android.app.Activity

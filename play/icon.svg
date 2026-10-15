@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 108 108">
   <!-- Same ">_" as the adaptive launcher icon; Play applies its own rounded mask. -->
-  <rect width="108" height="108" fill="#0E1116"/>
+  <rect width="108" height="108" fill="#050805"/>
   <g transform="translate(18 18) scale(3)">
-    <path fill="#7EE787" d="M4.3,6.3l1.4,-1.4L12.8,12l-7.1,7.1 -1.4,-1.4L10,12z"/>
-    <path fill="#E6EDF3" d="M12,17h8v2h-8z"/>
+    <path fill="#00FF41" d="M4.3,6.3l1.4,-1.4L12.8,12l-7.1,7.1 -1.4,-1.4L10,12z"/>
+    <path fill="#00FF41" d="M12,17h8v2h-8z"/>
   </g>
 </svg>

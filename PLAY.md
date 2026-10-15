@@ -1,4 +1,4 @@
-# Publishing PocketShell on Google Play
+# Publishing exterm on Google Play
 
 Everything the Play Console asks for, in the order it asks.
 
@@ -26,8 +26,8 @@ Bump `versionCode` (and `versionName`) in `app/build.gradle.kts` for every uploa
 
 | Field | Value |
 |---|---|
-| App name | PocketShell |
-| Package | `codes.exterkamp.pocketshell` (permanent once published) |
+| App name | exterm |
+| Package | `codes.exterkamp.exterm` (permanent once published) |
 | Category | Tools |
 | Free / paid | Free, no ads, no in-app purchases |
 | Contact email | (your choice; shown publicly) |
@@ -39,7 +39,7 @@ Bump `versionCode` (and `versionName`) in `app/build.gradle.kts` for every uploa
 
 **Full description:**
 
-> PocketShell is a plain SSH and mosh client for getting to your own machines from your phone.
+> exterm is a plain SSH and mosh client for getting to your own machines from your phone.
 >
 > • Save hosts once, connect with a tap: SSH or mosh, password or a device key (ed25519, generated or imported)
 > • mosh sessions survive network switches and the phone sleeping
@@ -49,7 +49,7 @@ Bump `versionCode` (and `versionName`) in `app/build.gradle.kts` for every uploa
 > • Run a command on connect (tmux, herdr…), and reconnect automatically if Android closes the app
 > • Long-press links to open or copy them
 >
-> No accounts, no sign-in, no analytics, no ads. PocketShell only connects to the hosts you add, and your
+> No accounts, no sign-in, no analytics, no ads. exterm only connects to the hosts you add, and your
 > passwords and keys stay encrypted on your device. Open source: https://github.com/exterkamp/pocketshell
 
 ## Policy forms

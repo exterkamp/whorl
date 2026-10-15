@@ -1,4 +1,4 @@
-package codes.exterkamp.pocketshell
+package codes.exterkamp.exterm
 
 import android.content.Context
 import android.os.Build
@@ -154,7 +154,7 @@ object Ssh {
     fun importDeviceKey(context: Context, privateKey: String, passphrase: String?) =
         storeDeviceKey(context, loadKey(privateKey, passphrase, deviceComment()))
 
-    private fun deviceComment() = "pocketshell@${Build.MODEL.replace(' ', '-')}"
+    private fun deviceComment() = "exterm@${Build.MODEL.replace(' ', '-')}"
 
     private fun storeDeviceKey(context: Context, key: Pair<String, String>) {
         val store = Store.get(context)

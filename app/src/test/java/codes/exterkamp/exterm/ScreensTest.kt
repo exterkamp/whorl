@@ -1,4 +1,4 @@
-package codes.exterkamp.pocketshell
+package codes.exterkamp.exterm
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable

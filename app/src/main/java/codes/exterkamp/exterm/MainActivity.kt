@@ -1,4 +1,4 @@
-package codes.exterkamp.pocketshell
+package codes.exterkamp.exterm
 
 import android.Manifest
 import android.content.ClipData
@@ -417,7 +417,7 @@ internal fun HostList(
     Scaffold(
         containerColor = colors.background,
         topBar = {
-            TuiBar("pocketshell") {
+            TuiBar("exterm") {
                 TuiAction("key", onDeviceKey, color = colors.onSurfaceVariant)
                 TuiAction("about", onAbout, color = colors.onSurfaceVariant)
             }
@@ -833,7 +833,7 @@ internal fun About(onBack: () -> Unit) {
         ) {
             Spacer(Modifier.height(4.dp))
             Row(verticalAlignment = Alignment.Bottom) {
-                Text("pocketshell", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = colors.primary)
+                Text("exterm", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = colors.primary)
                 Spacer(Modifier.width(10.dp))
                 Text("v$version", fontSize = 13.sp, color = colors.onSurfaceVariant, modifier = Modifier.padding(bottom = 3.dp))
             }

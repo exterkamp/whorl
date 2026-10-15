@@ -12,5 +12,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "pocketshell"
+rootProject.name = "exterm"
 include(":app", ":terminal-emulator", ":terminal-view")

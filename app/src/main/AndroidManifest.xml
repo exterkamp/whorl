@@ -8,12 +8,12 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
-        android:name=".PocketShell"
+        android:name=".ExtermApp"
         android:allowBackup="false"
         android:extractNativeLibs="true"
         android:icon="@mipmap/ic_launcher"
-        android:label="PocketShell"
-        android:theme="@style/Theme.PocketShell">
+        android:label="exterm"
+        android:theme="@style/Theme.Exterm">
 
         <activity
             android:name=".MainActivity"
