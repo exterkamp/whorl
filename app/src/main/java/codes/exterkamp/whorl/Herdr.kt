@@ -10,6 +10,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.io.IOException
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.thread
 
@@ -127,7 +129,7 @@ object HerdrProtocol {
 
 /**
  * Keeps an eye on the herdr server on a machine with an open session, over a second SSH connection of its own so
- * it works for mosh sessions too. It polls herdr's agent list, raises an alert when an agent needs the user or
+ * it works for mosh sessions too. It follows herdr's agents (herdr announces each change, so it isn't polling), raises an alert when an agent needs the user or
  * finishes, and can switch herdr to an agent. Machines without herdr just never become [available].
  */
 class HerdrLink(private val app: Context, private val session: ActiveSession) {
@@ -140,6 +142,7 @@ class HerdrLink(private val app: Context, private val session: ActiveSession) {
         private set
 
     @Volatile private var running = true
+    @Volatile private var subscription: Subscription? = null
     @Volatile private var ssh: Session? = null
     @Volatile private var socket: String? = null
     private val ids = AtomicInteger()
@@ -156,6 +159,7 @@ class HerdrLink(private val app: Context, private val session: ActiveSession) {
 
     fun stop() {
         running = false
+        subscription?.close()
         thread(isDaemon = true) { runCatching { ssh?.disconnect() } }
         update(false, emptyList())
     }
@@ -183,6 +187,7 @@ class HerdrLink(private val app: Context, private val session: ActiveSession) {
                 ssh = connection
                 backoff = RETRY_MS
                 var previous: List<HerdrAgent>? = null
+                var subscription: Subscription? = null
                 while (running && connection.isConnected) {
                     socket = socket ?: exec(connection, HerdrProtocol.FIND_SOCKET).ifBlank { null }
                     if (socket == null) {
@@ -216,8 +221,31 @@ class HerdrLink(private val app: Context, private val session: ActiveSession) {
                         runCatching { call("agent.focus", JSONObject().put("target", pane)) }
                         continue
                     }
-                    sleep(POLL_MS)
+                    // Rather than asking over and over, have herdr say when an agent's state changes; it subscribes
+                    // per pane, so a new set of agents needs a new subscription.
+                    val panes = now.map { it.paneId }.toSet()
+                    if (subscription == null || subscription.panes != panes) {
+                        subscription?.close()
+                        subscription = runCatching { Subscription(connection, panes) }.getOrNull()
+                        this.subscription = subscription
+                    }
+                    if (subscription == null) {
+                        sleep(FALLBACK_MS)
+                        continue
+                    }
+                    // Wait for herdr's word, or a minute in case an event went missing.
+                    val line = subscription.lines.poll(FALLBACK_MS, TimeUnit.MILLISECONDS)
+                    if (line == SUBSCRIPTION_CLOSED) {
+                        subscription = null
+                        // Don't spin if herdr keeps refusing it (an older version, say).
+                        sleep(RETRY_MS)
+                    } else {
+                        // Events come in bursts; one look at the agents covers the lot.
+                        Thread.sleep(SETTLE_MS)
+                        subscription.lines.removeIf { it != SUBSCRIPTION_CLOSED }
+                    }
                 }
+                subscription?.close()
             } catch (e: Exception) {
                 // Unreachable, or the connection dropped; try again after a pause.
             }
@@ -287,6 +315,39 @@ class HerdrLink(private val app: Context, private val session: ActiveSession) {
         while (running && System.currentTimeMillis() < until) Thread.sleep(200)
     }
 
+    /**
+     * A held-open `events.subscribe` on herdr's socket: herdr writes a line whenever an agent in one of [panes]
+     * changes state, or an agent appears or a pane closes. The lines are only a cue to look again.
+     */
+    private inner class Subscription(connection: Session, val panes: Set<String>) {
+        val lines = LinkedBlockingQueue<String>()
+        private val channel = connection.openChannel("direct-streamlocal@openssh.com") as ChannelDirectStreamLocal
+
+        init {
+            channel.socketPath = socket ?: throw IOException("no herdr socket")
+            val input = channel.inputStream
+            val output = channel.outputStream
+            channel.connect(CALL_TIMEOUT_MS)
+            val subscriptions = JSONArray()
+                .put(JSONObject().put("type", "pane.agent_detected"))
+                .put(JSONObject().put("type", "pane.closed"))
+            panes.forEach { subscriptions.put(JSONObject().put("type", "pane.agent_status_changed").put("pane_id", it)) }
+            val request = HerdrProtocol.request(
+                "whorl:${ids.incrementAndGet()}", "events.subscribe", JSONObject().put("subscriptions", subscriptions),
+            )
+            output.write(request.toByteArray())
+            output.flush()
+            thread(name = "herdr-events", isDaemon = true) {
+                runCatching { input.bufferedReader().forEachLine { lines.put(it) } }
+                lines.put(SUBSCRIPTION_CLOSED)
+            }
+        }
+
+        fun close() {
+            runCatching { channel.disconnect() }
+        }
+    }
+
     /** No one to ask: the session already trusted the host key, and a password must be saved for this to work. */
     private object Silent : Prompter {
         override fun yesNo(title: String, message: String) = false
@@ -296,7 +357,12 @@ class HerdrLink(private val app: Context, private val session: ActiveSession) {
     }
 
     companion object {
-        private const val POLL_MS = 4_000L
+        /** With herdr announcing changes, this is only a safety net for a missed event. */
+        private const val FALLBACK_MS = 60_000L
+        private const val SETTLE_MS = 300L
+
+        /** Queued after a subscription's last line, when herdr or the connection ends it. */
+        private const val SUBSCRIPTION_CLOSED = "\u0000closed"
         private const val LOOK_AGAIN_MS = 20_000L
         private const val RETRY_MS = 5_000L
         private const val MAX_RETRY_MS = 60_000L
