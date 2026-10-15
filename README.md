@@ -28,13 +28,14 @@ sign-in, no paid tier, and no network traffic except to your own hosts.
 ### Mosh
 
 The app signs in over SSH, runs `mosh-server new …` on the server, and hands the terminal to a bundled
-`mosh-client`. The server needs mosh installed and UDP 60000–61000 reachable. If `mosh-server` isn't on the
-PATH for non-interactive logins (Homebrew, `~/.local/bin`), put its full path in the host's
-**mosh-server command**.
+`mosh-client`. The server needs mosh installed and UDP 60000–61000 reachable. The default **mosh-server
+command** looks in `~/.local/bin`, `/opt/homebrew/bin` and `/usr/local/bin` before the system PATH, since a
+non-interactive SSH login usually has none of them. If `mosh-server` is anywhere else, put its full path there.
 
 mosh-server older than 1.4.0 (Ubuntu 20.04 ships 1.3.2) mangles 24-bit color, which shows up as dark text in
-Claude Code under herdr or tmux. `native/build-mosh-server-host.sh` builds a static 1.4.0 server you can put in
-your home directory without root; see `native/README.md`.
+Claude Code under herdr or tmux. `native/build-mosh-server-host.sh` builds a static 1.4.0 server. Install it as
+`~/.local/bin/mosh-server`, no root needed, and the default command picks it up ahead of the system one; see
+`native/README.md`.
 
 ## Publishing
 

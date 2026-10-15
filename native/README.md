@@ -68,6 +68,6 @@ To use it without replacing the system package:
 
     install -m755 native/out/mosh-server-1.4.0-x86_64 ~/.local/bin/mosh-server
 
-Then set the host's **mosh-server command** in the app to
-`~/.local/bin/mosh-server new -s -c 256 -l LANG=en_US.UTF-8`. Use the full path: a
-non-interactive SSH command often doesn't have `~/.local/bin` on its PATH.
+The app's default **mosh-server command** puts `~/.local/bin` ahead of the system PATH, so new
+hosts use it with no settings change. A host with a custom command needs `~/.local/bin/mosh-server`
+in it.

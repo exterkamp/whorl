@@ -22,7 +22,7 @@ data class Profile(
     val auth: AuthMethod = AuthMethod.DEVICE_KEY,
     /** Empty means ask every time. */
     val password: String = "",
-    /** Run on the server to start mosh; edit it when mosh-server isn't on the non-interactive PATH. */
+    /** Run on the server to start mosh; edit it when mosh-server lives somewhere the default doesn't look. */
     val moshServer: String = DEFAULT_MOSH_SERVER,
     /** Typed into the shell once connected, e.g. "herdr" or "tmux new -A -s main". Empty for none. */
     val startup: String = "",
@@ -35,7 +35,16 @@ data class Profile(
         .put("moshServer", moshServer).put("startup", startup)
 
     companion object {
-        const val DEFAULT_MOSH_SERVER = "mosh-server new -s -c 256 -l LANG=en_US.UTF-8"
+        /**
+         * Looks in ~/.local/bin and Homebrew's prefixes before the system PATH. A non-interactive SSH command
+         * usually has neither on its PATH, and ~/.local/bin is where a newer mosh-server goes without root:
+         * anything older than 1.4.0 mangles 24-bit color (see native/README.md).
+         */
+        const val DEFAULT_MOSH_SERVER =
+            "PATH=\"\$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:\$PATH\" mosh-server new -s -c 256 -l LANG=en_US.UTF-8"
+
+        /** Saved by versions before 0.2.0; moved to the current default on load. */
+        private const val OLD_DEFAULT_MOSH_SERVER = "mosh-server new -s -c 256 -l LANG=en_US.UTF-8"
 
         fun fromJson(o: JSONObject) = Profile(
             id = o.getString("id"),
@@ -46,7 +55,8 @@ data class Profile(
             protocol = Protocol.valueOf(o.optString("protocol", Protocol.MOSH.name)),
             auth = AuthMethod.valueOf(o.optString("auth", AuthMethod.DEVICE_KEY.name)),
             password = o.optString("password"),
-            moshServer = o.optString("moshServer").ifBlank { DEFAULT_MOSH_SERVER },
+            moshServer = o.optString("moshServer")
+                .takeUnless { it.isBlank() || it == OLD_DEFAULT_MOSH_SERVER } ?: DEFAULT_MOSH_SERVER,
             startup = o.optString("startup"),
         )
     }

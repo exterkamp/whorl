@@ -74,10 +74,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.concurrent.thread
@@ -417,7 +419,8 @@ private fun EditHost(
             if (protocol == Protocol.MOSH) {
                 Field("mosh-server command", moshServer, { moshServer = it }, mono = true)
                 Text(
-                    "If mosh-server isn't on the PATH for non-interactive logins (Homebrew, ~/.local), use its full path.",
+                    "The default looks in ~/.local/bin and Homebrew before the system PATH. Use a full path if " +
+                        "mosh-server is anywhere else.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -603,8 +606,30 @@ private fun About(onBack: () -> Unit) {
             OutlinedButton(onClick = { open(PRIVACY_URL) }) { Text("Privacy policy") }
             OutlinedButton(onClick = { open(SOURCE_URL) }) { Text("Source code") }
             OutlinedButton(onClick = { showLicenses = true }) { Text("Open source licenses") }
+            ExterwareMark(Modifier.fillMaxWidth().padding(top = 24.dp))
         }
     }
+}
+
+private val MatrixGreen = Color(0xFF00FF41)
+
+/** DejaVu Sans Mono, cut down to the mark's characters (res/font). Its own ♣ and ◆ keep Android from
+ * drawing them with the color emoji font, which ignores the text color, and they're one column wide. */
+private val MarkFont = FontFamily(Font(R.font.exterware_mono))
+
+/** The exterware mark: five clubs set like the Olympic rings between two diamond rules, over the wordmark. */
+@Composable
+private fun ExterwareMark(modifier: Modifier = Modifier) {
+    Text(
+        "────◆────\n♣   ♣   ♣\n  ♣   ♣  \n────◆────\nexterware",
+        color = MatrixGreen,
+        fontFamily = MarkFont,
+        fontSize = 18.sp,
+        lineHeight = 22.sp,
+        softWrap = false,
+        textAlign = TextAlign.Center,
+        modifier = modifier,
+    )
 }
 
 private const val SOURCE_URL = "https://github.com/exterkamp/pocketshell"
