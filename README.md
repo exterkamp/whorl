@@ -1,29 +1,40 @@
 # Whorl
 
-A bare-bones Android SSH and mosh client. Saved hosts, a terminal and an extra-keys row. No accounts, no
-sign-in, no paid tier, and no network traffic except to your own hosts.
+A plain Android SSH and mosh client for getting to your own machines. Saved machines, a real terminal and an
+extra-keys row. No accounts, no sign-in, no paid tier, and no network traffic except to your own machines.
 
 ## Using it
 
-- **Hosts:** tap **+** to add one. Choose Mosh or SSH, and sign in with either the device key or a password.
-  Leave the password blank to be asked each time. Tap a host to connect. Long-press it, or tap the pencil, to edit.
-- **Device key:** the lock icon on the host list opens it. Generate an ed25519 key, or import one you already
-  have, then copy or share the public key into `~/.ssh/authorized_keys` on each machine.
-- **Host keys** are trusted on first use and kept in the app's private `known_hosts`. If a key changes you'll
-  be asked again.
-- **Terminal:** tap to bring up the keyboard and pinch to resize text. The bar has esc, tab, ctrl and alt
-  (each latches for one key), arrows, home/end/pgup/pgdn, and a few symbols that phone keyboards bury.
+- **Machines:** tap **Add machine**. Give it one or more addresses, a user, Mosh or SSH, and sign in with
+  either the device key or a password (leave it blank to be asked each time). Tap a machine to connect;
+  long-press it, or tap the pencil, to edit.
+- **Several addresses:** list every way to reach a machine, such as its LAN address and its Tailscale one.
+  Connecting tries them all, a moment apart, and uses the first that answers, preferring the ones listed
+  first. When the network changes (Wi-Fi to cellular, say) and that address stops answering, the session
+  reconnects over another one by itself. The terminal header shows the route in use and what's happening.
+- **Device key:** the lock icon opens it. Generate an ed25519 key, or import one you already have, then copy or
+  share the public key into `~/.ssh/authorized_keys` on each machine.
+- **Host keys** are trusted on first use and kept in the app's private `known_hosts`, one entry per machine.
+  If a key changes you'll be asked again.
+- **Terminal:** tap to bring up the keyboard; swipe typing works. Pinch to resize text. The bar has a key to
+  hide or show the keyboard, Esc, Tab, Ctrl and Alt (each latches for one key), a joystick key for the arrows
+  (press and drag toward a direction, hold to repeat), Home/End/PgUp/PgDn, and symbols phone keyboards bury.
   **⋮** has paste, text size and disconnect. Long-press to select and copy.
-- **Sessions:** the header's ⌂ goes back to the host list without disconnecting, tapping the session name
-  switches between open sessions, and ✕ ends one. The host list shows open sessions at the top, where you
-  tap to resume or ✕ to end. Sessions keep running in the background behind a "Connected" notification.
-- **Run on connect:** a per-host command typed into the shell once connected, e.g. `herdr` or
+- **Sessions:** the back arrow returns to the machine list without disconnecting, tapping the session name
+  switches between open sessions, and ✕ ends one. Sessions keep running in the background behind a
+  "Connected" notification.
+- **Alerts:** when a program in a session you aren't looking at rings the bell, or asks for a notification
+  (OSC 9, 777 or 99), you get an Android notification that opens that session. Over mosh only the bell gets
+  through, so the notification shows the terminal's title.
+- **Run on connect:** a per-machine command typed into the shell once connected, e.g. `herdr` or
   `tmux new -A -s main`. Exiting it leaves you at the shell.
 - **Reattach:** if the app is killed (an update, or Android reclaiming memory), opening it again reconnects
   every session that was open. mosh can't resume from a new client, so the old mosh-server is stopped and a
   new one started; with a multiplexer as the run-on-connect command you land back where you were.
 - **Links:** long-press a URL for Open / Copy. It works on URLs that wrap across rows, including inside herdr
   and tmux panes. Long-press anywhere else selects text.
+- **Look:** Material 3, in your wallpaper's colors on Android 12 and later; light and dark follow the system,
+  the terminal included.
 
 ### Mosh
 
@@ -49,6 +60,7 @@ Everything builds in Docker. Nothing Android-related is installed on the host.
 ./build.sh                    # debug APK  -> app/build/outputs/apk/debug/app-debug.apk
 ./build.sh assembleRelease    # minified, debug-signed APK for sideloading
 ./build.sh testDebugUnitTest  # JVM tests
+./build.sh recordPaparazziDebug  # render the main screens to app/src/test/snapshots/images
 ```
 
 The Gradle cache and the debug signing key live in `~/.cache/pocketshell/`, so later builds are incremental
@@ -79,7 +91,8 @@ docker stop pocketshell-sshd
 
 | Path | What |
 |------|------|
-| `app/` | Kotlin app: Compose host list and editor (`MainActivity`), View-based terminal (`TerminalActivity`), JSch SSH and the mosh handshake (`Ssh.kt`), sessions and the foreground service (`Sessions.kt`) |
+| `app/` | Kotlin app: Compose machine list and editor (`MainActivity`), View-based terminal (`TerminalActivity`), JSch SSH and the mosh handshake (`Ssh.kt`), sessions and the foreground service (`Sessions.kt`), racing a machine's addresses (`Reach.kt`), reconnecting on network changes (`Reconnector.kt`), notifications from sessions (`Alerts.kt`) |
 | `terminal-emulator/`, `terminal-view/` | Termux's terminal emulator and view (Apache-2.0), changed so a session runs over a `TerminalTransport` (local pty or SSH channel); see their `NOTICE` |
-| `native/` | mosh-client cross-compile |
+| `native/` | mosh-client cross-compile, and a static mosh-server for hosts |
+| `play/` | Play Store icon and feature graphic |
 | `docker/` | build toolchain, emulator, and the test sshd |

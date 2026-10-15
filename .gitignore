@@ -6,3 +6,4 @@ local.properties
 native/build/
 native/out/
 native/build-host/
+.kotlin/

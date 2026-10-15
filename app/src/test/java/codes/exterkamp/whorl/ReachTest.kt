@@ -10,8 +10,8 @@ import java.net.ServerSocket
 import java.util.Collections
 
 class ReachTest {
-    private val lan = Address("192.168.1.174")
-    private val tailscale = Address("100.105.102.51")
+    private val lan = Address("192.168.1.20")
+    private val tailscale = Address("100.101.102.103")
     private val dns = Address("devbox.example.com")
 
     /** Each address connects after the given delay, or fails then if the delay is negative. */

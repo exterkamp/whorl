@@ -755,5 +755,5 @@ private fun ExterwareMark(modifier: Modifier = Modifier) {
     )
 }
 
-private const val SOURCE_URL = "https://github.com/exterkamp/exterm"
-private const val PRIVACY_URL = "https://github.com/exterkamp/exterm/blob/main/PRIVACY.md"
+private const val SOURCE_URL = "https://github.com/exterkamp/whorl"
+private const val PRIVACY_URL = "https://github.com/exterkamp/whorl/blob/main/PRIVACY.md"

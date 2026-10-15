@@ -11,8 +11,8 @@ Everything the Play Console asks for, in the order it asks.
    **Back up `~/.config/pocketshell/`** (e.g. as a password-manager attachment). `./build.sh` picks it up
    automatically. In the Console, leave **Play App Signing** on (the default): Google holds the real app
    signing key, and this one only uploads.
-3. **Make the GitHub repo public** before the first release. mosh-client is GPLv3, and the app's licenses
-   screen points users to this repo for its source.
+3. **The GitHub repo is public** (since 2026-10-15). It has to stay that way: mosh-client is GPLv3, and the
+   app's licenses screen points users to this repo for its source.
 
 ## Build
 
@@ -31,26 +31,29 @@ Bump `versionCode` (and `versionName`) in `app/build.gradle.kts` for every uploa
 | Category | Tools |
 | Free / paid | Free, no ads, no in-app purchases |
 | Contact email | (your choice; shown publicly) |
-| Privacy policy URL | https://github.com/exterkamp/exterm/blob/main/PRIVACY.md |
+| Privacy policy URL | https://github.com/exterkamp/whorl/blob/main/PRIVACY.md |
 
 **Short description** (80 max):
 
-> SSH and mosh terminal for your own machines. Saved hosts. No accounts, no ads.
+> SSH and mosh for your own machines. Follows you across networks. No ads.
 
 **Full description:**
 
 > Whorl is a plain SSH and mosh client for getting to your own machines from your phone.
 >
-> • Save hosts once, connect with a tap: SSH or mosh, password or a device key (ed25519, generated or imported)
+> • Save machines once, connect with a tap: SSH or mosh, password or a device key (ed25519, generated or imported)
+> • Give a machine several addresses (home Wi-Fi, Tailscale…): Whorl uses whichever answers, and moves the
+>   session to another when the network changes
 > • mosh sessions survive network switches and the phone sleeping
+> • Notifications when a program in a background session rings the bell, e.g. an agent that has finished
 > • A real terminal: 256-color and truecolor, mouse support for tmux, herdr and other TUIs, pinch to zoom
-> • An extra-keys row for Esc, Tab, Ctrl, Alt, arrows and the symbols phone keyboards hide
+> • Swipe typing, and an extra-keys row for Esc, Tab, Ctrl, Alt, arrows and the symbols phone keyboards hide
 > • Several sessions at once; switch between them, and they keep running in the background
 > • Run a command on connect (tmux, herdr…), and reconnect automatically if Android closes the app
 > • Long-press links to open or copy them
 >
-> No accounts, no sign-in, no analytics, no ads. Whorl only connects to the hosts you add, and your
-> passwords and keys stay encrypted on your device. Open source: https://github.com/exterkamp/exterm
+> No accounts, no sign-in, no analytics, no ads. Whorl only connects to the machines you add, and your
+> passwords and keys stay encrypted on your device. Open source: https://github.com/exterkamp/whorl
 
 ## Policy forms
 

@@ -17,8 +17,8 @@ class ScreensTest {
     val paparazzi = Paparazzi(deviceConfig = DeviceConfig.PIXEL_5, maxPercentDifference = 0.1)
 
     private val devbox = Profile(
-        id = "1", name = "devbox", user = "shane",
-        addresses = listOf(Address("192.168.1.174"), Address("100.105.102.51")), startup = "herdr",
+        id = "1", name = "devbox", user = "me",
+        addresses = listOf(Address("192.168.1.20"), Address("100.101.102.103")), startup = "herdr",
     )
     private val pi = Profile(id = "2", name = "", user = "pi", addresses = listOf(Address("raspberrypi.lan")), protocol = Protocol.SSH)
     private val vps = Profile(id = "3", name = "vps", user = "root", addresses = listOf(Address("vps.example.com", 2222)))

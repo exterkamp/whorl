@@ -5,7 +5,7 @@ mosh-client 1.4.0
 License: GNU General Public License v3, with an exception permitting linking with OpenSSL
 Whorl runs mosh-client as a separate program. Its complete corresponding source, with the build
 script and the one-line patch used for Android (native/build-mosh.sh), is in the Whorl repository:
-https://github.com/exterkamp/exterm
+https://github.com/exterkamp/whorl
 Upstream: https://mosh.org
 
 GNU GENERAL PUBLIC LICENSE
