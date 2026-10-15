@@ -1,5 +1,6 @@
 package codes.exterkamp.pocketshell
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.ClipData
@@ -273,10 +274,7 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
         key("tab") { sendKey(KeyEvent.KEYCODE_TAB) }
         ctrlKey = key("ctrl") { ctrlLatched = !ctrlLatched; refreshModifiers() }
         altKey = key("alt") { altLatched = !altLatched; refreshModifiers() }
-        key("←") { sendKey(KeyEvent.KEYCODE_DPAD_LEFT) }
-        key("↓") { sendKey(KeyEvent.KEYCODE_DPAD_DOWN) }
-        key("↑") { sendKey(KeyEvent.KEYCODE_DPAD_UP) }
-        key("→") { sendKey(KeyEvent.KEYCODE_DPAD_RIGHT) }
+        joystick(key(JOYSTICK) {})
         for (c in listOf("-", "/", "|", "~", "`")) key(c) { terminalView.inputCodePoint(c.codePointAt(0), false, false) }
         key("home") { sendKey(KeyEvent.KEYCODE_MOVE_HOME) }
         key("end") { sendKey(KeyEvent.KEYCODE_MOVE_END) }
@@ -288,6 +286,68 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
             isHorizontalScrollBarEnabled = false
             setBackgroundColor(BAR)
             addView(row)
+        }
+    }
+
+    /**
+     * One key for all four arrows: press it and drag toward a direction. The arrow is sent once, then repeats for
+     * as long as the finger stays there, faster the further it's dragged. Sliding to another side changes direction
+     * without lifting.
+     */
+    @SuppressLint("ClickableViewAccessibility")
+    private fun joystick(view: TextView) {
+        view.contentDescription = "Arrow keys: press and drag toward a direction"
+        val deadZone = dp(12)
+        val far = dp(56)
+        var originX = 0f
+        var originY = 0f
+        var distance = 0f
+        var direction = 0
+        val repeat = object : Runnable {
+            override fun run() {
+                if (direction == 0) return
+                sendKey(direction)
+                view.postDelayed(this, if (distance > far) 35L else 90L)
+            }
+        }
+        fun release() {
+            direction = 0
+            view.removeCallbacks(repeat)
+            view.text = JOYSTICK
+            view.background = keyBackground(false)
+        }
+        view.setOnTouchListener { v, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    originX = event.rawX
+                    originY = event.rawY
+                    // Keep the scrolling key bar from taking a sideways drag.
+                    v.parent.requestDisallowInterceptTouchEvent(true)
+                    v.background = keyBackground(true)
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val dx = event.rawX - originX
+                    val dy = event.rawY - originY
+                    distance = kotlin.math.hypot(dx, dy)
+                    val next = when {
+                        distance < deadZone -> 0
+                        kotlin.math.abs(dx) > kotlin.math.abs(dy) -> if (dx > 0) KeyEvent.KEYCODE_DPAD_RIGHT else KeyEvent.KEYCODE_DPAD_LEFT
+                        else -> if (dy > 0) KeyEvent.KEYCODE_DPAD_DOWN else KeyEvent.KEYCODE_DPAD_UP
+                    }
+                    if (next != direction) {
+                        direction = next
+                        view.removeCallbacks(repeat)
+                        view.text = ARROWS[next] ?: JOYSTICK
+                        if (next != 0) {
+                            v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                            sendKey(next)
+                            view.postDelayed(repeat, 350L)
+                        }
+                    }
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> release()
+            }
+            true
         }
     }
 
@@ -540,6 +600,11 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
 
     companion object {
         private const val EXTRA_PROFILE = "profile"
+        private const val JOYSTICK = "✥"
+        private val ARROWS = mapOf(
+            KeyEvent.KEYCODE_DPAD_LEFT to "←", KeyEvent.KEYCODE_DPAD_RIGHT to "→",
+            KeyEvent.KEYCODE_DPAD_UP to "↑", KeyEvent.KEYCODE_DPAD_DOWN to "↓",
+        )
 
         // The same phosphor palette as the rest of the app (MainActivity's Colors).
         private val BACKGROUND = Color.parseColor("#050805")
