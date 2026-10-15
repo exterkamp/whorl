@@ -1,4 +1,4 @@
-package codes.exterkamp.exterm
+package codes.exterkamp.conch
 
 import android.annotation.SuppressLint
 import android.app.Activity
@@ -9,7 +9,10 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
+import android.content.res.ColorStateList
+import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.RippleDrawable
 import android.os.Bundle
 import android.text.InputType
 import android.util.TypedValue
@@ -24,6 +27,7 @@ import android.view.WindowManager
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.HorizontalScrollView
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.PopupMenu
 import android.widget.TextView
@@ -31,6 +35,7 @@ import androidx.core.content.res.ResourcesCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.compose.ui.graphics.toArgb
 import com.termux.terminal.KeyHandler
 import com.termux.terminal.TerminalSession
 import com.termux.terminal.TerminalSessionClient
@@ -50,10 +55,22 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
     private lateinit var altKey: TextView
     private lateinit var session: ActiveSession
 
-    private lateinit var keyboardKey: TextView
+    private lateinit var keyboardKey: View
 
-    /** JetBrains Mono, the same face as the rest of the app. */
+    /** JetBrains Mono, for the terminal text. The chrome around it uses the system font, as Material does. */
     private val font: Typeface by lazy { ResourcesCompat.getFont(this, R.font.jetbrains_mono) ?: Typeface.MONOSPACE }
+    private val medium: Typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+
+    // The app's Material colors: the wallpaper's on Android 12 and later, light or dark with the system.
+    private val palette by lazy { appColors(this, isDark(this)) }
+    private val surfaceColor by lazy { palette.surface.toArgb() }
+    private val barColor by lazy { palette.surfaceContainer.toArgb() }
+    private val keyColor by lazy { palette.surfaceContainerHighest.toArgb() }
+    private val textColor by lazy { palette.onSurface.toArgb() }
+    private val mutedColor by lazy { palette.onSurfaceVariant.toArgb() }
+    private val accentColor by lazy { palette.primary.toArgb() }
+    private val selectedColor by lazy { palette.primaryContainer.toArgb() }
+    private val warnColor by lazy { palette.tertiary.toArgb() }
 
     /** Whether the soft keyboard is up, from the window insets. */
     private var keyboardShown = false
@@ -79,8 +96,15 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
 
         fontSize = store.fontSize.takeIf { it > 0 } ?: sp(13f)
 
+        // The terminal's colors follow light and dark; sessions already open take the new ones too.
+        if (TerminalTheme.apply(this)) Sessions.all().forEach { it.terminal.emulator?.mColors?.reset() }
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            isAppearanceLightStatusBars = !isDark(this@TerminalActivity)
+            isAppearanceLightNavigationBars = !isDark(this@TerminalActivity)
+        }
+
         terminalView = TerminalView(this, null).apply {
-            setBackgroundColor(BACKGROUND)
+            setBackgroundColor(surfaceColor)
             setTerminalViewClient(this@TerminalActivity)
             setTextSize(fontSize)
             setTypeface(font)
@@ -93,7 +117,7 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
 
         setContentView(LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(BACKGROUND)
+            setBackgroundColor(surfaceColor)
             ViewCompat.setOnApplyWindowInsetsListener(this) { view, insets ->
                 val bars = insets.getInsets(
                     WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout() or
@@ -181,45 +205,40 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
     private fun buildHeader(): View = LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
-        setBackgroundColor(BAR)
-        setPadding(dp(4), 0, dp(4), 0)
+        setBackgroundColor(barColor)
+        setPadding(dp(4), dp(4), dp(4), dp(4))
 
-        fun iconButton(label: String, description: String, onTap: () -> Unit) = TextView(context).apply {
-            typeface = font
-            text = label
+        fun iconButton(icon: Int, description: String, onTap: () -> Unit) = ImageView(context).apply {
+            setImageResource(icon)
+            imageTintList = ColorStateList.valueOf(textColor)
             contentDescription = description
-            setTextColor(MUTED)
-            textSize = 17f
-            gravity = Gravity.CENTER
-            minWidth = dp(48)
-            minHeight = dp(52)
-            setPadding(dp(8), dp(8), dp(8), dp(8))
+            scaleType = ImageView.ScaleType.CENTER
+            background = ripple(oval = true)
             setOnClickListener { onTap() }
-        }
+        }.also { addView(it, LinearLayout.LayoutParams(dp(48), dp(48))) }
 
-        // Home: back to the host list, leaving this session running.
-        addView(iconButton("<", "Machines") { finish() })
+        // Home: back to the machine list, leaving this session running.
+        iconButton(R.drawable.ic_arrow_back, "Machines") { finish() }
 
         // The current session; tap to switch between sessions.
         addView(LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(8), dp(4), dp(8), dp(4))
+            background = ripple(oval = false)
             sessionDot = View(context).apply {
-                background = GradientDrawable().apply { setColor(ACCENT) }
+                background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(accentColor) }
             }
             addView(sessionDot, LinearLayout.LayoutParams(dp(8), dp(8)).apply { marginEnd = dp(12) })
             sessionTitle = TextView(context).apply {
-                typeface = font
-                setTextColor(FOREGROUND)
-                typeface = ResourcesCompat.getFont(context, R.font.jetbrains_mono_bold) ?: font
-                textSize = 15f
+                typeface = medium
+                setTextColor(textColor)
+                textSize = 16f
                 maxLines = 1
                 ellipsize = android.text.TextUtils.TruncateAt.END
             }
             statusLine = TextView(context).apply {
-                typeface = font
-                textSize = 11f
+                textSize = 12f
                 maxLines = 1
                 ellipsize = android.text.TextUtils.TruncateAt.END
             }
@@ -228,24 +247,15 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
                 addView(sessionTitle)
                 addView(statusLine)
             }, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
-            addView(TextView(context).apply {
-                typeface = font
-                text = "▾"
-                setTextColor(MUTED)
-                setPadding(dp(8), 0, 0, 0)
+            addView(ImageView(context).apply {
+                setImageResource(R.drawable.ic_arrow_drop_down)
+                imageTintList = ColorStateList.valueOf(mutedColor)
             })
             setOnClickListener { showSessionSwitcher(it) }
         }, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
 
         // End this session.
-        addView(iconButton("x", "End session") { endSession() })
-    }.let { header ->
-        // A rule under the header, as on the other screens.
-        LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            addView(header, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
-            addView(View(context).apply { setBackgroundColor(RULE) }, LinearLayout.LayoutParams(MATCH_PARENT, dp(1)))
-        }
+        iconButton(R.drawable.ic_close, "End session") { endSession() }
     }
 
     private fun refreshHeader() {
@@ -259,19 +269,19 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
 
     /** The header's status line: what the connection is doing right now, and its color. */
     private fun statusOf(s: ActiveSession): Pair<String, Int> {
-        val protocol = s.profile.protocol.name.lowercase()
+        val protocol = if (s.profile.protocol == Protocol.MOSH) "mosh" else "SSH"
         val route = s.route
         return when {
             s.finished && s.terminal.exitStatus == EXIT_DROPPED ->
-                "connection lost · reconnects when the network answers" to WARN
+                "Connection lost · reconnects when the network answers" to warnColor
             s.finished && s.automatic && route == null ->
-                "couldn't reconnect · retries on the next network change" to WARN
-            s.finished -> "disconnected" to MUTED
-            route == null && s.automatic -> "reconnecting (${s.reason}) · ${s.progress}" to WARN
-            route == null -> s.progress to WARN
+                "Couldn't reconnect · retries on the next network change" to warnColor
+            s.finished -> "Disconnected" to mutedColor
+            route == null && s.automatic -> "Reconnecting (${s.reason}) · ${s.progress}" to warnColor
+            route == null -> s.progress.replaceFirstChar { it.uppercase() } to warnColor
             else -> {
                 val port = if (route.port != 22) ":${route.port}" else ""
-                "live · $protocol via ${route.via} ${route.ip}$port" to ACCENT
+                "Connected · $protocol via ${route.via} ${route.ip}$port" to accentColor
             }
         }
     }
@@ -308,40 +318,50 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
     private fun buildKeysBar(): View {
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(4), dp(4), dp(4), dp(4))
+            setPadding(dp(6), dp(6), dp(6), dp(6))
         }
-        fun key(label: String, onTap: (View) -> Unit): TextView = TextView(this).apply {
-            typeface = font
-            text = label
-            setTextColor(FOREGROUND)
-            textSize = 15f
-            gravity = Gravity.CENTER
-            minWidth = dp(46)
-            setPadding(dp(10), dp(10), dp(10), dp(10))
+        fun <V : View> V.place(onTap: (View) -> Unit): V = apply {
             background = keyBackground(false)
             setOnClickListener {
                 it.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
                 onTap(it)
             }
-            row.addView(this, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply { marginEnd = dp(4) })
+            row.addView(this, LinearLayout.LayoutParams(WRAP_CONTENT, dp(42)).apply { marginEnd = dp(6) })
         }
+        fun key(label: String, onTap: (View) -> Unit): TextView = TextView(this).apply {
+            typeface = medium
+            text = label
+            setTextColor(textColor)
+            textSize = 14f
+            gravity = Gravity.CENTER
+            minWidth = dp(48)
+            setPadding(dp(12), 0, dp(12), 0)
+        }.place(onTap)
+        fun iconKey(icon: Int, description: String, onTap: (View) -> Unit) = ImageView(this).apply {
+            setImageResource(icon)
+            imageTintList = ColorStateList.valueOf(textColor)
+            contentDescription = description
+            scaleType = ImageView.ScaleType.CENTER
+            minimumWidth = dp(48)
+            setPadding(dp(12), 0, dp(12), 0)
+        }.place(onTap)
 
-        keyboardKey = key("⌨") { toggleKeyboard() }.apply { contentDescription = "Show or hide the keyboard" }
-        key("esc") { sendKey(KeyEvent.KEYCODE_ESCAPE) }
-        key("tab") { sendKey(KeyEvent.KEYCODE_TAB) }
-        ctrlKey = key("ctrl") { ctrlLatched = !ctrlLatched; refreshModifiers() }
-        altKey = key("alt") { altLatched = !altLatched; refreshModifiers() }
+        keyboardKey = iconKey(R.drawable.ic_keyboard, "Show or hide the keyboard") { toggleKeyboard() }
+        key("Esc") { sendKey(KeyEvent.KEYCODE_ESCAPE) }
+        key("Tab") { sendKey(KeyEvent.KEYCODE_TAB) }
+        ctrlKey = key("Ctrl") { ctrlLatched = !ctrlLatched; refreshModifiers() }
+        altKey = key("Alt") { altLatched = !altLatched; refreshModifiers() }
         joystick(key(JOYSTICK) {})
-        for (c in listOf("-", "/", "|", "~", "`")) key(c) { terminalView.inputCodePoint(c.codePointAt(0), false, false) }
-        key("home") { sendKey(KeyEvent.KEYCODE_MOVE_HOME) }
-        key("end") { sendKey(KeyEvent.KEYCODE_MOVE_END) }
-        key("pgup") { sendKey(KeyEvent.KEYCODE_PAGE_UP) }
-        key("pgdn") { sendKey(KeyEvent.KEYCODE_PAGE_DOWN) }
-        key("⋮") { showMenu(it) }
+        for (c in listOf("-", "/", "|", "~", "`")) key(c) { terminalView.inputCodePoint(c.codePointAt(0), false, false) }.typeface = font
+        key("Home") { sendKey(KeyEvent.KEYCODE_MOVE_HOME) }
+        key("End") { sendKey(KeyEvent.KEYCODE_MOVE_END) }
+        key("PgUp") { sendKey(KeyEvent.KEYCODE_PAGE_UP) }
+        key("PgDn") { sendKey(KeyEvent.KEYCODE_PAGE_DOWN) }
+        iconKey(R.drawable.ic_more_vert, "More") { showMenu(it) }
 
         return HorizontalScrollView(this).apply {
             isHorizontalScrollBarEnabled = false
-            setBackgroundColor(BAR)
+            setBackgroundColor(barColor)
             addView(row)
         }
     }
@@ -436,22 +456,26 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
     private fun buildEndedBar(): View = LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
-        setBackgroundColor(BAR)
-        setPadding(dp(16), dp(8), dp(8), dp(8))
+        setBackgroundColor(barColor)
+        setPadding(dp(16), dp(6), dp(8), dp(6))
         addView(TextView(context).apply {
-            typeface = font
-            text = "-- disconnected --"
-            setTextColor(FOREGROUND)
+            text = "Disconnected"
+            textSize = 15f
+            setTextColor(textColor)
         }, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
         fun button(label: String, onTap: () -> Unit) = addView(TextView(context).apply {
-            typeface = font
+            typeface = medium
             text = label
-            setTextColor(ACCENT)
-            setPadding(dp(12), dp(10), dp(12), dp(10))
+            textSize = 14f
+            setTextColor(accentColor)
+            gravity = Gravity.CENTER
+            minHeight = dp(40)
+            setPadding(dp(12), 0, dp(12), 0)
+            background = ripple(oval = false)
             setOnClickListener { onTap() }
         })
-        button("[ reconnect ]") { Sessions.reconnect(this@TerminalActivity, session, reason = null) }
-        button("[ close ]") { endSession() }
+        button("Reconnect") { Sessions.reconnect(this@TerminalActivity, session, reason = null) }
+        button("Close") { endSession() }
     }
 
     private fun showEnded(ended: Boolean) {
@@ -495,7 +519,7 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
 
     override fun askYesNo(title: String, message: String, answer: (Boolean) -> Unit) {
         var answered = false
-        AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+        AlertDialog.Builder(this)
             .setTitle(title)
             .setMessage(message)
             .setPositiveButton("Yes") { _, _ -> answered = true; answer(true) }
@@ -510,7 +534,7 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
             hint = message.trim().removeSuffix(":")
         }
-        val dialog = AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+        val dialog = AlertDialog.Builder(this)
             .setTitle(title)
             .setView(LinearLayout(this).apply {
                 setPadding(dp(20), dp(8), dp(20), 0)
@@ -658,11 +682,25 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
 
     // ---- helpers ------------------------------------------------------------------------------------------------
 
-    /** Square keys outlined like a TUI's buttons; a latched modifier lights up. */
-    private fun keyBackground(active: Boolean) = GradientDrawable().apply {
-        setColor(if (active) ACCENT_DIM else KEY)
-        setStroke(dp(1), if (active) ACCENT else KEY_BORDER)
-    }
+    /** Rounded tonal keys; a latched modifier, or the keyboard key while the keyboard is up, is filled. */
+    private fun keyBackground(active: Boolean): Drawable = RippleDrawable(
+        ColorStateList.valueOf(palette.onSurface.copy(alpha = 0.12f).toArgb()),
+        GradientDrawable().apply {
+            cornerRadius = dp(8).toFloat()
+            setColor(if (active) selectedColor else keyColor)
+        },
+        null,
+    )
+
+    /** The touch ripple Material buttons have. */
+    private fun ripple(oval: Boolean): Drawable = RippleDrawable(
+        ColorStateList.valueOf(palette.onSurface.copy(alpha = 0.12f).toArgb()),
+        null,
+        GradientDrawable().apply {
+            if (oval) shape = GradientDrawable.OVAL else cornerRadius = dp(8).toFloat()
+            setColor(Color.WHITE)
+        },
+    )
 
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 
@@ -676,18 +714,6 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
             KeyEvent.KEYCODE_DPAD_LEFT to "←", KeyEvent.KEYCODE_DPAD_RIGHT to "→",
             KeyEvent.KEYCODE_DPAD_UP to "↑", KeyEvent.KEYCODE_DPAD_DOWN to "↓",
         )
-
-        // The same phosphor palette as the rest of the app (MainActivity's Colors).
-        private val BACKGROUND = Color.parseColor("#050805")
-        private val BAR = Color.parseColor("#0B120C")
-        private val KEY = Color.parseColor("#0B120C")
-        private val KEY_BORDER = Color.parseColor("#1F5A2E")
-        private val RULE = Color.parseColor("#143D20")
-        private val FOREGROUND = Color.parseColor("#CFF5D6")
-        private val MUTED = Color.parseColor("#6F9A78")
-        private val ACCENT = Color.parseColor("#00FF41")
-        private val ACCENT_DIM = Color.parseColor("#0B3D1A")
-        private val WARN = Color.parseColor("#FFB000")
 
         fun intent(context: Context, profile: Profile) =
             Intent(context, TerminalActivity::class.java).putExtra(EXTRA_PROFILE, profile.id)

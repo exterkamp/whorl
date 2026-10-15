@@ -1,4 +1,4 @@
-package codes.exterkamp.exterm
+package codes.exterkamp.conch
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull

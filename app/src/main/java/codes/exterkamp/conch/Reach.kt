@@ -1,4 +1,4 @@
-package codes.exterkamp.exterm
+package codes.exterkamp.conch
 
 import java.io.IOException
 import java.net.InetAddress

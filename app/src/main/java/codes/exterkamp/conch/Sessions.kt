@@ -1,4 +1,4 @@
-package codes.exterkamp.exterm
+package codes.exterkamp.conch
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -288,7 +288,7 @@ class SessionService : Service() {
             this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE,
         )
         return Notification.Builder(this, CHANNEL)
-            .setSmallIcon(R.drawable.ic_terminal)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(text)
             .setContentIntent(open)

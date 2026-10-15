@@ -8,12 +8,12 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
-        android:name=".ExtermApp"
+        android:name=".ConchApp"
         android:allowBackup="false"
         android:extractNativeLibs="true"
         android:icon="@mipmap/ic_launcher"
-        android:label="exterm"
-        android:theme="@style/Theme.Exterm">
+        android:label="Conch"
+        android:theme="@style/Theme.Conch">
 
         <activity
             android:name=".MainActivity"
@@ -27,7 +27,7 @@
 
         <activity
             android:name=".TerminalActivity"
-            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|density"
             android:windowSoftInputMode="adjustResize|stateAlwaysVisible" />
 
         <service

@@ -14,12 +14,12 @@ val uploadKeyProperties = file(System.getenv("POCKETSHELL_SIGNING") ?: "/nonexis
     ?.let { f -> Properties().apply { f.inputStream().use { load(it) } } }
 
 android {
-    namespace = "codes.exterkamp.exterm"
+    namespace = "codes.exterkamp.conch"
     compileSdk = 36
     buildToolsVersion = "36.0.0"
 
     defaultConfig {
-        applicationId = "codes.exterkamp.exterm"
+        applicationId = "codes.exterkamp.conch"
         minSdk = 26
         targetSdk = 36
         versionCode = 2
@@ -79,6 +79,7 @@ dependencies {
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
     implementation(platform("androidx.compose:compose-bom:2024.06.00"))
     implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material-icons-core")
     implementation("androidx.compose.ui:ui")
 
     testImplementation("junit:junit:4.13.2")

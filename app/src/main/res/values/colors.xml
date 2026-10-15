@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="background">#050805</color>
-    <color name="accent">#00FF41</color>
+    <color name="ic_launcher_background">#006A6A</color>
+    <!-- The ocean fallback palette's surface and primary (see Theme.kt), until Compose draws. -->
+    <color name="window">#FAFDFC</color>
+    <color name="accent">#006A6A</color>
 </resources>

@@ -1,4 +1,4 @@
-package codes.exterkamp.exterm
+package codes.exterkamp.conch
 
 import android.content.Context
 import android.net.ConnectivityManager

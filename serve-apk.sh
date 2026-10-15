@@ -5,5 +5,5 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 mkdir -p build/serve
-cp app/build/outputs/apk/release/app-release.apk build/serve/exterm.apk
+cp app/build/outputs/apk/release/app-release.apk build/serve/conch.apk
 exec python3 -m http.server "${PORT:?}" --bind 0.0.0.0 --directory build/serve

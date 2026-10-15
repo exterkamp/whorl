@@ -1,14 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="500" viewBox="0 0 1024 500">
-  <rect width="1024" height="500" fill="#050805"/>
-  <rect x="24" y="24" width="976" height="452" fill="none" stroke="#143D20" stroke-width="2"/>
-  <g transform="translate(64 138) scale(8.5)">
-    <path fill="#00FF41" d="M4.3,6.3l1.4,-1.4L12.8,12l-7.1,7.1 -1.4,-1.4L10,12z"/>
-    <path fill="#00FF41" d="M12,17h8v2h-8z"/>
+  <rect width="1024" height="500" fill="#006A6A"/>
+  <g transform="translate(20 40) scale(3.9)">
+  <g transform="rotate(-20 54 56)" stroke="#006A6A" stroke-width="2.4" stroke-linejoin="round">
+    <path fill="#FFE2CC" d="M26,58 C26,52 82,52 82,58 C85,66 80,75 71,80 L58,88 C56,90 52,90 50,88 L37,80 C28,75 23,66 26,58 Z"/>
+    <path fill="#FFF4EA" d="M33,46 C36,40 72,40 75,46 C79,50 80,54 78,57 C70,62 38,62 30,57 C28,54 29,50 33,46 Z"/>
+    <path fill="#FFE2CC" d="M42,34 C45,30 63,30 66,34 C69,37 70,40 69,43 C63,47 45,47 39,43 C38,40 39,37 42,34 Z"/>
+    <path fill="#FFF4EA" d="M54,20 C57,20 61,26 62,30 C62,33 60,35 54,35 C48,35 46,33 46,30 C47,26 51,20 54,20 Z"/>
+    <path fill="#F28C6B" stroke="none" d="M61,63 C71,62 78,67 74,74 C70,80 62,84 56,86 C60,78 59,70 61,63 Z"/>
   </g>
-  <text x="300" y="214" font-family="JetBrains Mono NL" font-weight="bold" font-size="96" fill="#00FF41">exterm</text>
-  <text x="304" y="270" font-family="JetBrains Mono NL" font-size="28" fill="#CFF5D6">ssh + mosh for your own machines</text>
-  <text x="304" y="310" font-family="JetBrains Mono NL" font-size="28" fill="#6F9A78">no accounts. no ads. no tracking.</text>
-  <rect x="300" y="346" width="452" height="56" fill="#0B120C" stroke="#1F5A2E" stroke-width="2"/>
-  <text x="320" y="383" font-family="JetBrains Mono NL" font-size="24" fill="#6F9A78">you@home:~$ <tspan fill="#CFF5D6">herdr</tspan><tspan fill="#00FF41">█</tspan></text>
-  <text x="976" y="452" text-anchor="end" font-family="DejaVu Sans Mono" font-size="20" fill="#1F5A2E">exterware ♣</text>
+  </g>
+  <text x="460" y="225" font-family="DejaVu Sans" font-weight="bold" font-size="92" fill="#FFFFFF">Conch</text>
+  <text x="464" y="285" font-family="DejaVu Sans" font-size="27" fill="#CCE8E7">SSH and mosh for your own machines.</text>
+  <text x="464" y="330" font-family="DejaVu Sans" font-size="27" fill="#CCE8E7">No accounts. No ads.</text>
 </svg>

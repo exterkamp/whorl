@@ -1,4 +1,4 @@
-package codes.exterkamp.exterm
+package codes.exterkamp.conch
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -50,7 +50,7 @@ object Alerts {
         manager.notify(
             notificationId(id),
             Notification.Builder(app, CHANNEL)
-                .setSmallIcon(R.drawable.ic_terminal)
+                .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle(heading)
                 .setContentText(text)
                 .setStyle(Notification.BigTextStyle().bigText(text))

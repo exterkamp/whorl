@@ -1,4 +1,4 @@
-package codes.exterkamp.exterm
+package codes.exterkamp.conch
 
 import android.content.Context
 import android.content.SharedPreferences
@@ -80,7 +80,7 @@ data class Profile(
     val label: String get() = name.ifBlank { "$user@${addresses.firstOrNull()?.host.orEmpty()}" }
 
     /** Where trusted host keys are filed in known_hosts. One per machine, since every address reaches the same sshd. */
-    val hostKeyAlias: String get() = "exterm-machine-$id"
+    val hostKeyAlias: String get() = "conch-machine-$id"
 
     fun toJson(): JSONObject = JSONObject()
         .put("id", id).put("name", name).put("port", port).put("user", user)
@@ -183,7 +183,7 @@ class Store private constructor(private val prefs: SharedPreferences) {
                 val app = context.applicationContext
                 val masterKey = MasterKey.Builder(app).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()
                 val prefs = EncryptedSharedPreferences.create(
-                    app, "exterm", masterKey,
+                    app, "conch", masterKey,
                     EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
                     EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
                 )

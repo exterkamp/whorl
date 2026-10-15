@@ -1,10 +1,10 @@
-exterm is built from these open source components.
+Conch is built from these open source components.
 
 ========================================================================
 mosh-client 1.4.0
 License: GNU General Public License v3, with an exception permitting linking with OpenSSL
-exterm runs mosh-client as a separate program. Its complete corresponding source, with the build
-script and the one-line patch used for Android (native/build-mosh.sh), is in the exterm repository:
+Conch runs mosh-client as a separate program. Its complete corresponding source, with the build
+script and the one-line patch used for Android (native/build-mosh.sh), is in the Conch repository:
 https://github.com/exterkamp/exterm
 Upstream: https://mosh.org
 
@@ -947,7 +947,7 @@ https://github.com/termux/termux-app
 terminal-emulator and terminal-view are copied from termux-app v0.118.0
 (https://github.com/termux/termux-app), which carries them under the Apache
 License 2.0 as a derivative of jackpal's Android-Terminal-Emulator.
-Modified for exterm: TerminalSession runs over a pluggable TerminalTransport
+Modified for Conch: TerminalSession runs over a pluggable TerminalTransport
 (local pty process or a remote SSH channel) instead of always spawning a process.
 
 ========================================================================
@@ -1324,7 +1324,7 @@ Apache License
 
 
 ========================================================================
-JetBrains Mono 2.304 (the app and terminal font)
+JetBrains Mono 2.304 (the terminal font)
 License: SIL Open Font License 1.1
 
 Copyright 2020 The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono)

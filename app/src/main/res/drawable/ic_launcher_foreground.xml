@@ -1,8 +1,13 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
-    <!-- A ">_" prompt: the 24-unit glyph from ic_terminal, scaled 2x and centered in the 66dp safe zone. -->
-    <group android:scaleX="2" android:scaleY="2" android:translateX="30" android:translateY="30">
-        <path android:fillColor="#00FF41" android:pathData="M4.3,6.3l1.4,-1.4L12.8,12l-7.1,7.1 -1.4,-1.4L10,12z" />
-        <path android:fillColor="#00FF41" android:pathData="M12,17h8v2h-8z" />
+    <!-- A seashell, the Conch logo. The source is play/icon.svg. -->
+    <group android:pivotX="54" android:pivotY="54" android:scaleX="0.86" android:scaleY="0.86" android:translateX="0" android:translateY="0">
+        <group android:pivotX="54" android:pivotY="56" android:rotation="-20">
+            <path android:fillColor="#FFE2CC" android:strokeColor="#006A6A" android:strokeWidth="2.4" android:strokeLineJoin="round" android:pathData="M26,58 C26,52 82,52 82,58 C85,66 80,75 71,80 L58,88 C56,90 52,90 50,88 L37,80 C28,75 23,66 26,58 Z" />
+            <path android:fillColor="#FFF4EA" android:strokeColor="#006A6A" android:strokeWidth="2.4" android:strokeLineJoin="round" android:pathData="M33,46 C36,40 72,40 75,46 C79,50 80,54 78,57 C70,62 38,62 30,57 C28,54 29,50 33,46 Z" />
+            <path android:fillColor="#FFE2CC" android:strokeColor="#006A6A" android:strokeWidth="2.4" android:strokeLineJoin="round" android:pathData="M42,34 C45,30 63,30 66,34 C69,37 70,40 69,43 C63,47 45,47 39,43 C38,40 39,37 42,34 Z" />
+            <path android:fillColor="#FFF4EA" android:strokeColor="#006A6A" android:strokeWidth="2.4" android:strokeLineJoin="round" android:pathData="M54,20 C57,20 61,26 62,30 C62,33 60,35 54,35 C48,35 46,33 46,30 C47,26 51,20 54,20 Z" />
+            <path android:fillColor="#F28C6B" android:pathData="M61,63 C71,62 78,67 74,74 C70,80 62,84 56,86 C60,78 59,70 61,63 Z" />
+        </group>
     </group>
 </vector>

@@ -1,4 +1,4 @@
-package codes.exterkamp.exterm
+package codes.exterkamp.conch
 
 import com.termux.terminal.TerminalEmulator
 import com.termux.terminal.TerminalOutput
