@@ -96,3 +96,17 @@ docker stop pocketshell-sshd
 | `native/` | mosh-client cross-compile, and a static mosh-server for hosts |
 | `play/` | Play Store icon and feature graphic |
 | `docker/` | build toolchain, emulator, and the test sshd |
+
+## License
+
+Whorl is licensed under the [Apache License 2.0](LICENSE). Copyright 2026 Shane Exterkamp.
+
+Some parts keep their own licenses:
+
+- `terminal-emulator/` and `terminal-view/` are Termux's, also Apache-2.0, with changes described in their `NOTICE`.
+- `app/src/main/jniLibs/arm64-v8a/libmoshclient.so` is mosh-client, GPLv3 (with an OpenSSL linking exception). The
+  app runs it as a separate program, and its source and build script are in `native/`.
+- The fonts in `app/src/main/res/font/` are JetBrains Mono (SIL Open Font License 1.1) and a DejaVu Sans Mono
+  subset (Bitstream Vera license).
+
+`app/src/main/assets/licenses.txt`, shown in the app under About, has the full text of each.
