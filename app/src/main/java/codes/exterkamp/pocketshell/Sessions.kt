@@ -35,9 +35,15 @@ interface PromptUi {
 
 class ActiveSession(
     val profile: Profile,
-    /** Started by the app after a dropped connection or a network change, rather than by the user. */
-    val automatic: Boolean = false,
+    /** Why the app reconnected this on its own ("network changed"); null when the user started it. */
+    val reason: String? = null,
 ) : Prompter {
+    val automatic: Boolean get() = reason != null
+
+    /** The latest progress line while connecting, for the header's status line. */
+    @Volatile var progress: String = "connecting"
+        private set
+
     lateinit var terminal: TerminalSession
     lateinit var transport: com.termux.terminal.TerminalTransport
     @Volatile var finished = false
@@ -87,7 +93,11 @@ class ActiveSession(
     override fun secret(title: String, message: String): String? =
         ask<String?>(null) { ui, answer -> ui.askSecret(title, message, answer) }
 
-    override fun status(text: String) = terminal.printLocal("\u001b[2m$text\u001b[0m\r\n")
+    override fun status(text: String) {
+        terminal.printLocal("\u001b[2m$text\u001b[0m\r\n")
+        progress = text.trim().removeSuffix("…").lowercase()
+        main.post { ui?.refresh() }
+    }
 
     override fun connected(route: Route) {
         this.route = route
@@ -131,7 +141,7 @@ object Sessions {
     fun open(context: Context, profile: Profile): ActiveSession {
         sessions.values.firstOrNull { it.profile.id == profile.id && !it.finished }?.let { return it }
         sessions.values.filter { it.profile.id == profile.id }.forEach { remove(context, it) }
-        return start(context, profile, automatic = false)
+        return start(context, profile, reason = null)
     }
 
     /**
@@ -139,11 +149,11 @@ object Sessions {
      * using is stopped by the new connection (its pid is still stored), and the multiplexer in the run-on-connect
      * command, if any, puts the user back where they were. Whatever screen shows [old] switches to the new one.
      */
-    fun reconnect(context: Context, old: ActiveSession, automatic: Boolean): ActiveSession {
+    fun reconnect(context: Context, old: ActiveSession, reason: String?): ActiveSession {
         val size = old.terminal.emulator?.let { it.mColumns to it.mRows } ?: (80 to 24)
         val ui = old.ui
         sessions.remove(old.profile.id)
-        val next = start(context, old.profile, automatic)
+        val next = start(context, old.profile, reason)
         old.replacedBy = next
         old.attach(null)
         old.listener = null
@@ -153,9 +163,9 @@ object Sessions {
         return next
     }
 
-    private fun start(context: Context, profile: Profile, automatic: Boolean): ActiveSession {
+    private fun start(context: Context, profile: Profile, reason: String?): ActiveSession {
         val app = context.applicationContext
-        val active = ActiveSession(profile, automatic)
+        val active = ActiveSession(profile, reason)
         val transport = when (profile.protocol) {
             Protocol.SSH -> SshTransport(app, profile, active)
             Protocol.MOSH -> MoshTransport(app, profile, active)

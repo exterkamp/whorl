@@ -77,12 +77,13 @@ object Reconnector {
         val stalled = Sessions.stalled()
         if (routed.isEmpty() && stalled.isEmpty()) return
         worker.execute {
-            val moved = routed.filter { (session, route) -> !Reach.probe(route) && reachable(session.profile) }.map { it.first }
-            val retry = stalled.filter { reachable(it.profile) }
+            val moved = routed.filter { (session, route) -> !Reach.probe(route) && reachable(session.profile) }
+                .map { it.first to "${it.second.via} stopped answering" }
+            val retry = stalled.filter { reachable(it.profile) }.map { it to (it.reason ?: "connection dropped") }
             main.post {
                 (moved + retry)
-                    .filter { Sessions.isCurrent(it) && it.replacedBy == null }
-                    .forEach { Sessions.reconnect(context, it, automatic = true) }
+                    .filter { (session, _) -> Sessions.isCurrent(session) && session.replacedBy == null }
+                    .forEach { (session, reason) -> Sessions.reconnect(context, session, reason) }
             }
         }
     }

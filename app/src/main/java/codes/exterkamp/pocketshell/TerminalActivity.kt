@@ -43,6 +43,7 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
     private lateinit var keysBar: View
     private lateinit var endedBar: View
     private lateinit var sessionTitle: TextView
+    private lateinit var statusLine: TextView
     private lateinit var sessionDot: View
     private lateinit var ctrlKey: TextView
     private lateinit var altKey: TextView
@@ -186,7 +187,7 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
         addView(LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(8), dp(8), dp(8), dp(8))
+            setPadding(dp(8), dp(4), dp(8), dp(4))
             sessionDot = View(context).apply {
                 background = GradientDrawable().apply { setColor(ACCENT) }
             }
@@ -198,7 +199,17 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
                 maxLines = 1
                 ellipsize = android.text.TextUtils.TruncateAt.END
             }
-            addView(sessionTitle, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
+            statusLine = TextView(context).apply {
+                typeface = Typeface.MONOSPACE
+                textSize = 11f
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+            }
+            addView(LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(sessionTitle)
+                addView(statusLine)
+            }, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
             addView(TextView(context).apply {
                 typeface = Typeface.MONOSPACE
                 text = "▾"
@@ -214,10 +225,30 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
 
     private fun refreshHeader() {
         val others = Sessions.all().count { it !== session }
-        // Which address the connection took, when the machine has more than one.
-        val via = session.route?.takeIf { session.profile.addresses.size > 1 }?.let { "  ·  ${it.via}" }.orEmpty()
-        sessionTitle.text = session.profile.label + via + if (others > 0) "  ·  +$others" else ""
-        (sessionDot.background as GradientDrawable).setColor(if (session.finished) MUTED else ACCENT)
+        sessionTitle.text = session.profile.label + if (others > 0) "  ·  +$others" else ""
+        val (status, color) = statusOf(session)
+        statusLine.text = status
+        statusLine.setTextColor(color)
+        (sessionDot.background as GradientDrawable).setColor(color)
+    }
+
+    /** The header's status line: what the connection is doing right now, and its color. */
+    private fun statusOf(s: ActiveSession): Pair<String, Int> {
+        val protocol = s.profile.protocol.name.lowercase()
+        val route = s.route
+        return when {
+            s.finished && s.terminal.exitStatus == EXIT_DROPPED ->
+                "connection lost · reconnects when the network answers" to WARN
+            s.finished && s.automatic && route == null ->
+                "couldn't reconnect · retries on the next network change" to WARN
+            s.finished -> "disconnected" to MUTED
+            route == null && s.automatic -> "reconnecting (${s.reason}) · ${s.progress}" to WARN
+            route == null -> s.progress to WARN
+            else -> {
+                val port = if (route.port != 22) ":${route.port}" else ""
+                "live · $protocol via ${route.via} ${route.ip}$port" to ACCENT
+            }
+        }
     }
 
     private fun showSessionSwitcher(anchor: View) {
@@ -391,7 +422,7 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
             setPadding(dp(12), dp(10), dp(12), dp(10))
             setOnClickListener { onTap() }
         })
-        button("[ reconnect ]") { Sessions.reconnect(this@TerminalActivity, session, automatic = false) }
+        button("[ reconnect ]") { Sessions.reconnect(this@TerminalActivity, session, reason = null) }
         button("[ close ]") { endSession() }
     }
 
@@ -615,6 +646,7 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
         private val MUTED = Color.parseColor("#6F9A78")
         private val ACCENT = Color.parseColor("#00FF41")
         private val ACCENT_DIM = Color.parseColor("#0B3D1A")
+        private val WARN = Color.parseColor("#FFB000")
 
         fun intent(context: Context, profile: Profile) =
             Intent(context, TerminalActivity::class.java).putExtra(EXTRA_PROFILE, profile.id)
