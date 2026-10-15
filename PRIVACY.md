@@ -21,4 +21,4 @@ stay connected while the app is in the background.
 
 **Changes.** If this policy changes, the new version will be posted here with a new date.
 
-**Contact.** Open an issue at https://github.com/exterkamp/pocketshell/issues.
+**Contact.** Open an issue at https://github.com/exterkamp/exterm/issues.

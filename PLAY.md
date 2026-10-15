@@ -31,7 +31,7 @@ Bump `versionCode` (and `versionName`) in `app/build.gradle.kts` for every uploa
 | Category | Tools |
 | Free / paid | Free, no ads, no in-app purchases |
 | Contact email | (your choice; shown publicly) |
-| Privacy policy URL | https://github.com/exterkamp/pocketshell/blob/main/PRIVACY.md |
+| Privacy policy URL | https://github.com/exterkamp/exterm/blob/main/PRIVACY.md |
 
 **Short description** (80 max):
 
@@ -50,7 +50,7 @@ Bump `versionCode` (and `versionName`) in `app/build.gradle.kts` for every uploa
 > • Long-press links to open or copy them
 >
 > No accounts, no sign-in, no analytics, no ads. exterm only connects to the hosts you add, and your
-> passwords and keys stay encrypted on your device. Open source: https://github.com/exterkamp/pocketshell
+> passwords and keys stay encrypted on your device. Open source: https://github.com/exterkamp/exterm
 
 ## Policy forms
 
