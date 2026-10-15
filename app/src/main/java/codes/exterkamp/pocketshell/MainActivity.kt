@@ -78,16 +78,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.concurrent.thread
@@ -135,16 +132,9 @@ private val TuiShapes = RoundedCornerShape(0.dp).let { square ->
     Shapes(extraSmall = square, small = square, medium = square, large = square, extraLarge = square)
 }
 
-/** A screen title like a shell prompt's working directory. */
 @Composable
-private fun TuiTitle(path: String) {
-    Text(
-        buildAnnotatedString {
-            withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) { append("~/") }
-            withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary)) { append(path) }
-        },
-        fontWeight = FontWeight.Bold,
-    )
+private fun TuiTitle(title: String) {
+    Text(title, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
 }
 
 /** "[ label ]", the way a TUI draws a button. */
