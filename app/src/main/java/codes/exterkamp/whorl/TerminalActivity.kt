@@ -478,6 +478,14 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
             session.terminal.write(bytes, 0, bytes.size)
         }
         PopupMenu(this, anchor).apply {
+            // deck (github.com/exterkamp/herdr-deck), the agents board, if it's installed as a herdr plugin.
+            menu.add("Open deck").setOnMenuItemClickListener {
+                terminalView.resetKeyboardInput()
+                session.herdr?.openPluginPane("exterkamp.deck", "board") { error ->
+                    android.widget.Toast.makeText(this@TerminalActivity, "deck: $error", android.widget.Toast.LENGTH_LONG).show()
+                }
+                true
+            }
             listOf(
                 "Workspaces" to "w", "New tab" to "c", "Next tab" to "n", "Previous tab" to "p",
                 "Next pane" to "\t", "Zoom pane" to "z", "Split side by side" to "v", "Split top and bottom" to "-",

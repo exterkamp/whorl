@@ -179,6 +179,19 @@ class HerdrLink(private val app: Context, private val session: ActiveSession) {
         }
     }
 
+    /**
+     * Open a herdr plugin's pane, such as deck (exterkamp.deck), over herdr. [onError] is told, on the main thread,
+     * if herdr refused, e.g. because the plugin isn't installed.
+     */
+    fun openPluginPane(pluginId: String, entrypoint: String, onError: (String) -> Unit) {
+        thread(isDaemon = true) {
+            val error = runCatching {
+                call("plugin.pane.open", JSONObject().put("plugin_id", pluginId).put("entrypoint", entrypoint).put("focus", true))
+            }.exceptionOrNull()
+            if (error != null) main.post { onError(error.message ?: "herdr didn't open it") }
+        }
+    }
+
     private fun run() {
         var backoff = RETRY_MS
         while (running) {
