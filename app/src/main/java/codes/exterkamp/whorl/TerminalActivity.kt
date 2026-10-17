@@ -486,6 +486,8 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
                 }
                 true
             }
+            menu.add("Rename workspace…").setOnMenuItemClickListener { renameFocused(workspace = true); true }
+            menu.add("Rename pane…").setOnMenuItemClickListener { renameFocused(workspace = false); true }
             listOf(
                 "Workspaces" to "w", "New tab" to "c", "Next tab" to "n", "Previous tab" to "p",
                 "Next pane" to "\t", "Zoom pane" to "z", "Split side by side" to "v", "Split top and bottom" to "-",
@@ -493,6 +495,42 @@ class TerminalActivity : Activity(), TerminalViewClient, TerminalSessionClient, 
             ).forEach { (label, keys) -> menu.add(label).setOnMenuItemClickListener { send(keys); true } }
             show()
         }
+    }
+
+    /** Ask for a new name for herdr's focused workspace or pane, starting from the one it has. */
+    private fun renameFocused(workspace: Boolean) {
+        val link = session.herdr ?: return
+        val complain = { error: String ->
+            android.widget.Toast.makeText(this, "herdr: $error", android.widget.Toast.LENGTH_LONG).show()
+        }
+        link.focused({ focus ->
+            val input = EditText(this).apply {
+                setText(if (workspace) focus.workspaceLabel else focus.paneLabel)
+                // Typing replaces the old name; a tap puts the cursor in it to edit instead.
+                setSelectAllOnFocus(true)
+                inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+                hint = if (workspace) "Workspace name" else "Empty gives it back to automatic naming"
+            }
+            val dialog = AlertDialog.Builder(this)
+                .setTitle(if (workspace) "Rename workspace" else "Rename pane")
+                .setView(LinearLayout(this).apply {
+                    setPadding(dp(20), dp(8), dp(20), 0)
+                    addView(input, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+                })
+                .setPositiveButton("Rename") { _, _ ->
+                    val name = input.text.toString().trim()
+                    when {
+                        workspace && name.isEmpty() -> complain("a workspace needs a name")
+                        workspace -> link.renameWorkspace(focus.workspaceId, name, complain)
+                        else -> link.renamePane(focus.paneId, name, complain)
+                    }
+                }
+                .setNegativeButton("Cancel", null)
+                .create()
+            dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
+            dialog.show()
+            input.requestFocus()
+        }, complain)
     }
 
     private fun showMenu(anchor: View) {

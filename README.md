@@ -31,7 +31,7 @@ extra-keys row. No accounts, no sign-in, no paid tier, and no network traffic ex
   polling. An agent that needs you or finishes sends a
   notification naming it, and tapping it opens the session with herdr switched to that agent. The session card
   and the terminal header show "3 agents · 1 needs you", the header's session menu lists the agents to switch
-  between, and a **herdr** key in the key row offers herdr's commands (workspaces, tabs, panes, detach)
+  between, and a **herdr** key in the key row offers herdr's commands (workspaces, tabs, panes, detach, and renaming the workspace or pane on screen)
   without chording Ctrl+B, plus **Open deck** for [deck](https://github.com/exterkamp/herdr-deck), a board of all
   the agents, when it's installed as a herdr plugin. It needs the device key or a saved password, since it connects without asking.
 - **Run on connect:** a per-machine command typed into the shell once connected, e.g. `herdr` or

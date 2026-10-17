@@ -192,6 +192,43 @@ class HerdrLink(private val app: Context, private val session: ActiveSession) {
         }
     }
 
+    /** What herdr is showing: its focused workspace and pane, with their current names. */
+    data class Focus(val workspaceId: String, val workspaceLabel: String, val paneId: String, val paneLabel: String)
+
+    /** Find herdr's focused workspace and pane, then [then] on the main thread; [onError] if herdr can't say. */
+    fun focused(then: (Focus) -> Unit, onError: (String) -> Unit) {
+        thread(isDaemon = true) {
+            val result = runCatching {
+                val workspaces = call("workspace.list").getJSONArray("workspaces")
+                val workspace = (0 until workspaces.length()).map { workspaces.getJSONObject(it) }
+                    .firstOrNull { it.optBoolean("focused") } ?: throw IOException("no workspace is focused")
+                val panes = call("pane.list", JSONObject().put("workspace_id", workspace.getString("workspace_id")))
+                    .getJSONArray("panes")
+                val pane = (0 until panes.length()).map { panes.getJSONObject(it) }
+                    .firstOrNull { it.optBoolean("focused") } ?: throw IOException("no pane is focused")
+                Focus(
+                    workspace.getString("workspace_id"), workspace.optString("label"),
+                    pane.getString("pane_id"), pane.optString("label"),
+                )
+            }
+            main.post { result.fold(then) { onError(it.message ?: "herdr didn't say") } }
+        }
+    }
+
+    fun renameWorkspace(workspaceId: String, label: String, onError: (String) -> Unit) =
+        request("workspace.rename", JSONObject().put("workspace_id", workspaceId).put("label", label), onError)
+
+    /** An empty [label] clears the pane's name, handing it back to automatic naming (auto-title, say). */
+    fun renamePane(paneId: String, label: String, onError: (String) -> Unit) =
+        request("pane.rename", JSONObject().put("pane_id", paneId).put("label", label.ifBlank { JSONObject.NULL }), onError)
+
+    private fun request(method: String, params: JSONObject, onError: (String) -> Unit) {
+        thread(isDaemon = true) {
+            val error = runCatching { call(method, params) }.exceptionOrNull()
+            if (error != null) main.post { onError(error.message ?: "herdr refused") } else poll()
+        }
+    }
+
     private fun run() {
         var backoff = RETRY_MS
         while (running) {
