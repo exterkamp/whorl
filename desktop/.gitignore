@@ -1,0 +1,3 @@
+/bundled/windows/mosh/
+# Skiko unpacks its native library under user.home, which is "?" in the build container.
+/?/

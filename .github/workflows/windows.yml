@@ -1,0 +1,100 @@
+# Builds Whorl for Windows: the desktop app, packaged as an MSI with Cygwin's mosh-client bundled.
+# Every push and PR gets the MSI as a build artifact; a tag desktop-v<version> also publishes it as a release.
+name: Windows desktop
+
+on:
+  push:
+    branches: [main, windows]
+    tags: ['desktop-v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  msi:
+    runs-on: windows-latest
+    env:
+      # The runner has no Android SDK; build only the desktop app and what it shares.
+      WHORL_DESKTOP_ONLY: '1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+
+      - name: Install Cygwin's mosh
+        uses: cygwin/cygwin-install-action@v4
+        with:
+          packages: mosh terminfo
+          install-dir: C:\cygwin
+
+      - name: Bundle mosh-client with its DLLs and terminfo
+        shell: pwsh
+        run: |
+          $cyg = 'C:\cygwin'
+          $dest = 'desktop\bundled\windows\mosh'
+          New-Item -ItemType Directory -Force "$dest\bin" | Out-Null
+          Copy-Item "$cyg\bin\mosh-client.exe" "$dest\bin\"
+          # Every Cygwin DLL it loads, directly or not.
+          & "$cyg\bin\cygcheck.exe" "$cyg\bin\mosh-client.exe" |
+            ForEach-Object { $_.Trim() } |
+            Where-Object { $_ -like "$cyg\bin\*.dll" } |
+            Sort-Object -Unique |
+            ForEach-Object { Copy-Item $_ "$dest\bin\" }
+          # Cygwin's root is the folder above bin\, so terminfo goes in usr\share\terminfo under it.
+          foreach ($d in 'x', '78') {
+            $src = "$cyg\usr\share\terminfo\$d"
+            if (Test-Path $src) {
+              New-Item -ItemType Directory -Force "$dest\usr\share\terminfo\$d" | Out-Null
+              Get-ChildItem $src -Filter 'xterm*' | Copy-Item -Destination "$dest\usr\share\terminfo\$d\"
+            }
+          }
+          # mosh is GPLv3: ship its license and say where its source is.
+          Get-ChildItem "$cyg\usr\share\doc\mosh" -ErrorAction SilentlyContinue | Where-Object Name -match 'COPYING|LICENSE' | Copy-Item -Destination "$dest\"
+          "mosh-client.exe and its DLLs are from Cygwin (https://cygwin.com); mosh is GPLv3, source at https://mosh.org" |
+            Set-Content "$dest\README.txt"
+          Get-ChildItem -Recurse $dest | Select-Object FullName, Length | Format-Table -AutoSize
+
+      - name: Test (including mosh end to end through the bundled client and ConPTY)
+        shell: pwsh
+        env:
+          WHORL_MOSH_E2E: '1'
+          WHORL_MOSH_SERVER: C:\cygwin\bin\mosh-server.exe
+          SHELL: /bin/bash
+        run: |
+          $env:WHORL_MOSH_CLIENT = "$PWD\desktop\bundled\windows\mosh\bin\mosh-client.exe"
+          $env:PATH = "C:\cygwin\bin;$env:PATH"
+          gradle --console=plain :core:test :desktop:test
+
+      - name: Package the MSI
+        shell: pwsh
+        run: |
+          $env:GIT_COMMIT = (git rev-parse --short HEAD)
+          gradle --console=plain :desktop:packageMsi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-reports
+          path: |
+            core/build/reports/tests
+            desktop/build/reports/tests
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Whorl-msi
+          path: desktop/build/compose/binaries/main/msi/*.msi
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: desktop/build/compose/binaries/main/msi/*.msi
