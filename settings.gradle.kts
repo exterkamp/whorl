@@ -13,4 +13,4 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "whorl"
-include(":app", ":terminal-emulator", ":terminal-view")
+include(":app", ":core", ":terminal-core", ":terminal-emulator", ":terminal-view")

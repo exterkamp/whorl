@@ -178,12 +178,19 @@ object Sessions {
         val app = context.applicationContext
         val active = ActiveSession(profile, reason)
         val transport = when (profile.protocol) {
-            Protocol.SSH -> SshTransport(app, profile, active)
-            Protocol.MOSH -> MoshTransport(app, profile, active)
+            Protocol.SSH -> SshTransport(AndroidPlatform.get(app), profile, active)
+            Protocol.MOSH -> MoshTransport(AndroidPlatform.get(app), profile, active)
         }
         active.transport = transport
         active.terminal = TerminalSession(transport, 5000, Forwarder(app, active))
-        active.herdr = HerdrLink(app, active)
+        active.herdr = HerdrLink(AndroidPlatform.get(app), profile, object : HerdrLink.Listener {
+            override fun agentEvent(agent: HerdrAgent, event: HerdrProtocol.Event) = Alerts.agent(app, active, agent, event)
+            override fun agentUnblocked(paneId: String) = Alerts.clearAgent(app, profile, paneId)
+            override fun changed() {
+                Sessions.changed() // (a bare changed() here would be this listener's own)
+                active.ui?.refresh()
+            }
+        })
         active.terminal.mSessionName = profile.id
         sessions[profile.id] = active
         Store.get(app).let { it.openSessions = it.openSessions + profile.id }

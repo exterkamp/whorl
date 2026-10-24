@@ -647,7 +647,7 @@ internal fun DeviceKey(store: Store, onBack: () -> Unit) {
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 FilledTonalButton(enabled = !busy, onClick = {
-                    val generate = { run { Ssh.generateDeviceKey(context) } }
+                    val generate = { run { Ssh.generateDeviceKey(AndroidPlatform.get(context)) } }
                     if (key != null) confirmReplace = generate else generate()
                 }) { Text(if (key == null) "Generate key" else "New key") }
                 OutlinedButton(enabled = !busy, onClick = { importing = !importing }) { Text("Import") }
@@ -662,7 +662,7 @@ internal fun DeviceKey(store: Store, onBack: () -> Unit) {
                 )
                 Field("Passphrase, if it has one", passphrase, { passphrase = it }, secret = true)
                 Button(enabled = !busy && privateKey.isNotBlank(), onClick = {
-                    val import = { run { Ssh.importDeviceKey(context, privateKey, passphrase) } }
+                    val import = { run { Ssh.importDeviceKey(AndroidPlatform.get(context), privateKey, passphrase) } }
                     if (key != null) confirmReplace = import else import()
                 }) { Text("Use this key") }
             }

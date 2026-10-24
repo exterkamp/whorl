@@ -31,3 +31,8 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 }
+
+dependencies {
+    // The emulator proper; this module adds the Android session, pty and JNI around it.
+    api(project(":terminal-core"))
+}

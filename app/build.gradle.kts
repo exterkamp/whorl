@@ -73,9 +73,7 @@ android {
 
 dependencies {
     implementation(project(":terminal-view"))
-
-    implementation("com.github.mwiede:jsch:0.2.20")
-    implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
+    implementation(project(":core"))
 
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.activity:activity-compose:1.10.0")

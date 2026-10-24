@@ -1,7 +1,5 @@
 package codes.exterkamp.whorl
 
-import android.content.Context
-import android.os.Build
 import com.jcraft.jsch.ChannelExec
 import com.jcraft.jsch.ChannelShell
 import com.jcraft.jsch.HostKey
@@ -12,10 +10,8 @@ import com.jcraft.jsch.Session
 import com.jcraft.jsch.SocketFactory
 import com.jcraft.jsch.UIKeyboardInteractive
 import com.jcraft.jsch.UserInfo
-import com.termux.terminal.ProcessTransport
 import com.termux.terminal.TerminalTransport
 import java.io.ByteArrayOutputStream
-import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
 import java.net.Socket
@@ -52,17 +48,17 @@ object Ssh {
         JSch.setConfig("xdh", "com.jcraft.jsch.bc.XDH")
     }
 
-    private fun jsch(context: Context): JSch = JSch().apply {
-        setKnownHosts(File(context.filesDir, "known_hosts").apply { if (!exists()) createNewFile() }.path)
+    private fun jsch(platform: Platform): JSch = JSch().apply {
+        setKnownHosts(platform.knownHosts.apply { parentFile?.mkdirs(); if (!exists()) createNewFile() }.path)
     }
 
     /**
      * Find which of the machine's addresses answers, open an authenticated SSH session over it, and return the
      * session with the route it took, which mosh needs.
      */
-    fun open(context: Context, profile: Profile, prompter: Prompter): Pair<Session, Route> {
-        val store = Store.get(context)
-        val jsch = jsch(context)
+    fun open(platform: Platform, profile: Profile, prompter: Prompter): Pair<Session, Route> {
+        val store = platform.store
+        val jsch = jsch(platform)
         adoptLegacyHostKeys(jsch, profile)
 
         if (profile.auth == AuthMethod.DEVICE_KEY) {
@@ -148,16 +144,16 @@ object Ssh {
     }
 
     /** Generate a fresh ed25519 key and make it the device key. */
-    fun generateDeviceKey(context: Context) = storeDeviceKey(context, newKey(deviceComment()))
+    fun generateDeviceKey(platform: Platform) = storeDeviceKey(platform, newKey(deviceComment(platform)))
 
     /** Use an existing private key (OpenSSH or PEM) as the device key. */
-    fun importDeviceKey(context: Context, privateKey: String, passphrase: String?) =
-        storeDeviceKey(context, loadKey(privateKey, passphrase, deviceComment()))
+    fun importDeviceKey(platform: Platform, privateKey: String, passphrase: String?) =
+        storeDeviceKey(platform, loadKey(privateKey, passphrase, deviceComment(platform)))
 
-    private fun deviceComment() = "whorl@${Build.MODEL.replace(' ', '-')}"
+    private fun deviceComment(platform: Platform) = "whorl@${platform.deviceName.replace(' ', '-')}"
 
-    private fun storeDeviceKey(context: Context, key: Pair<String, String>) {
-        val store = Store.get(context)
+    private fun storeDeviceKey(platform: Platform, key: Pair<String, String>) {
+        val store = platform.store
         store.deviceKey = key.first
         store.devicePublicKey = key.second
     }
@@ -279,7 +275,7 @@ private class PromptingUserInfo(
 
 /** Runs the whole session over an SSH shell channel. */
 class SshTransport(
-    private val context: Context,
+    private val platform: Platform,
     private val profile: Profile,
     private val prompter: Prompter,
 ) : TerminalTransport {
@@ -290,7 +286,7 @@ class SshTransport(
     @Volatile private var closed = false
 
     override fun connect(columns: Int, rows: Int) {
-        val (session, route) = Ssh.open(context, profile, prompter)
+        val (session, route) = Ssh.open(platform, profile, prompter)
         this.session = session
         val channel = session.openChannel("shell") as ChannelShell
         channel.setPtyType("xterm-256color", columns, rows, 0, 0)
@@ -340,16 +336,16 @@ class SshTransport(
  * handshake; everything after that is mosh's own UDP protocol.
  */
 class MoshTransport(
-    private val context: Context,
+    private val platform: Platform,
     private val profile: Profile,
     private val prompter: Prompter,
 ) : TerminalTransport {
-    @Volatile private var client: ProcessTransport? = null
+    @Volatile private var client: TerminalTransport? = null
     @Volatile private var closed = false
 
     override fun connect(columns: Int, rows: Int) {
-        val (session, route) = Ssh.open(context, profile, prompter)
-        val store = Store.get(context)
+        val (session, route) = Ssh.open(platform, profile, prompter)
+        val store = platform.store
         val (port, key) = try {
             stopPreviousServer(session, store.moshServerPid(profile.id))
             prompter.status("Starting mosh-server…")
@@ -360,16 +356,8 @@ class MoshTransport(
         }
         if (closed) throw ConnectException("Cancelled")
 
-        val executable = File(context.applicationInfo.nativeLibraryDir, "libmoshclient.so").path
-        val env = arrayOf(
-            "MOSH_KEY=$key",
-            "TERM=xterm-256color",
-            "LANG=C.UTF-8",
-            "HOME=${context.filesDir.path}",
-            "TMPDIR=${context.cacheDir.path}",
-        )
         prompter.status("mosh: ${route.ip}:$port\r\n")
-        val client = ProcessTransport(executable, context.filesDir.path, arrayOf(executable, route.ip, port), env)
+        val client = platform.moshClient(route.ip, port, key)
         this.client = client
         client.connect(columns, rows)
         prompter.connected(route)
@@ -385,7 +373,7 @@ class MoshTransport(
         runCatching {
             exec(session, "case \"$(ps -o comm= -p $pid)\" in mosh-server*) kill $pid ;; esac")
         }
-        Store.get(context).setMoshServerPid(profile.id, 0)
+        platform.store.setMoshServerPid(profile.id, 0)
     }
 
     private fun exec(session: Session, command: String) {
@@ -444,7 +432,7 @@ class MoshTransport(
     }
 
     /** Called when the user ends the session: the client tells the server to exit, so forget its pid. */
-    fun forgetServer() = Store.get(context).setMoshServerPid(profile.id, 0)
+    fun forgetServer() = platform.store.setMoshServerPid(profile.id, 0)
 
     companion object {
         private val MOSH_CONNECT = Regex("""MOSH CONNECT (\d+) ([A-Za-z0-9/+]{22})""")

@@ -1,8 +1,5 @@
 package codes.exterkamp.whorl
 
-import android.content.Context
-import android.os.Handler
-import android.os.Looper
 import com.jcraft.jsch.ChannelDirectStreamLocal
 import com.jcraft.jsch.ChannelExec
 import com.jcraft.jsch.Session
@@ -132,7 +129,23 @@ object HerdrProtocol {
  * it works for mosh sessions too. It follows herdr's agents (herdr announces each change, so it isn't polling), raises an alert when an agent needs the user or
  * finishes, and can switch herdr to an agent. Machines without herdr just never become [available].
  */
-class HerdrLink(private val app: Context, private val session: ActiveSession) {
+class HerdrLink(
+    private val platform: Platform,
+    private val profile: Profile,
+    private val listener: Listener,
+) {
+    /** How the app hears about herdr. Called on the UI thread. */
+    interface Listener {
+        /** An agent started waiting on the user, or finished a turn. */
+        fun agentEvent(agent: HerdrAgent, event: HerdrProtocol.Event)
+
+        /** An agent that was waiting on the user no longer is; withdraw its alert. */
+        fun agentUnblocked(paneId: String)
+
+        /** [agents] or [available] changed. */
+        fun changed()
+    }
+
     /** The agents as of the last poll; empty when herdr isn't reachable. */
     @Volatile var agents: List<HerdrAgent> = emptyList()
         private set
@@ -146,15 +159,13 @@ class HerdrLink(private val app: Context, private val session: ActiveSession) {
     @Volatile private var ssh: Session? = null
     @Volatile private var socket: String? = null
     private val ids = AtomicInteger()
-    private val main = Handler(Looper.getMainLooper())
-
     @Volatile private var started = false
 
     /** Once the session is up; later calls do nothing. */
     fun start() {
         if (started) return
         started = true
-        thread(name = "herdr-${session.profile.id}", isDaemon = true) { run() }
+        thread(name = "herdr-${profile.id}", isDaemon = true) { run() }
     }
 
     fun stop() {
@@ -188,7 +199,7 @@ class HerdrLink(private val app: Context, private val session: ActiveSession) {
             val error = runCatching {
                 call("plugin.pane.open", JSONObject().put("plugin_id", pluginId).put("entrypoint", entrypoint).put("focus", true))
             }.exceptionOrNull()
-            if (error != null) main.post { onError(error.message ?: "herdr didn't open it") }
+            if (error != null) platform.post { onError(error.message ?: "herdr didn't open it") }
         }
     }
 
@@ -211,7 +222,7 @@ class HerdrLink(private val app: Context, private val session: ActiveSession) {
                     pane.getString("pane_id"), pane.optString("label"),
                 )
             }
-            main.post { result.fold(then) { onError(it.message ?: "herdr didn't say") } }
+            platform.post { result.fold(then) { onError(it.message ?: "herdr didn't say") } }
         }
     }
 
@@ -225,7 +236,7 @@ class HerdrLink(private val app: Context, private val session: ActiveSession) {
     private fun request(method: String, params: JSONObject, onError: (String) -> Unit) {
         thread(isDaemon = true) {
             val error = runCatching { call(method, params) }.exceptionOrNull()
-            if (error != null) main.post { onError(error.message ?: "herdr refused") } else poll()
+            if (error != null) platform.post { onError(error.message ?: "herdr refused") } else poll()
         }
     }
 
@@ -233,7 +244,7 @@ class HerdrLink(private val app: Context, private val session: ActiveSession) {
         var backoff = RETRY_MS
         while (running) {
             try {
-                val (connection, _) = Ssh.open(app, session.profile, Silent)
+                val (connection, _) = Ssh.open(platform, profile, Silent)
                 ssh = connection
                 backoff = RETRY_MS
                 var previous: List<HerdrAgent>? = null
@@ -255,11 +266,11 @@ class HerdrLink(private val app: Context, private val session: ActiveSession) {
                     }
                     previous?.let { before ->
                         HerdrProtocol.events(before, now).forEach { (agent, event) ->
-                            main.post { Alerts.agent(app, session, agent, event) }
+                            platform.post { listener.agentEvent(agent, event) }
                         }
                         now.filter { it.status != HerdrAgent.Status.BLOCKED }.forEach { agent ->
                             if (before.any { it.paneId == agent.paneId && it.status == HerdrAgent.Status.BLOCKED }) {
-                                main.post { Alerts.clearAgent(app, session.profile, agent.paneId) }
+                                platform.post { listener.agentUnblocked(agent.paneId) }
                             }
                         }
                     }
@@ -316,10 +327,7 @@ class HerdrLink(private val app: Context, private val session: ActiveSession) {
         if (available == this.available && agents == this.agents) return
         this.available = available
         this.agents = agents
-        main.post {
-            Sessions.changed()
-            session.ui?.refresh()
-        }
+        platform.post { listener.changed() }
     }
 
     /** One request over a fresh channel to herdr's socket. */

@@ -5,7 +5,7 @@ package com.termux.terminal;
  * send callbacks to the client when {@link TerminalSession} changes or for sending other
  * back data to the client like logs.
  */
-public interface TerminalSessionClient {
+public interface TerminalSessionClient extends TerminalEmulatorClient {
 
     void onTextChanged(TerminalSession changedSession);
 
