@@ -17,9 +17,11 @@ a Start-menu entry, and a newer MSI upgrades it in place.
 - Tabs, one per machine; a dropped connection reconnects by itself after 3 seconds.
 - herdr: the header shows the machine's agents and switches to one; an agent that needs you or finishes pops a
   Windows notification (click it to jump there) unless you're already looking at it.
-- Keys: Ctrl+Shift+C / Ctrl+Shift+V copy and paste (Ctrl+C copies when there's a selection, right-click copies or
-  pastes), Ctrl+Shift+T machine list, Ctrl+Tab next tab, Ctrl+Shift+W close tab, Ctrl+= / Ctrl+- text size.
-  Shift+drag selects even when a program has the mouse.
+- Copy and paste the Windows way: drag to select (even when herdr, tmux or vim has the mouse; a plain click still
+  goes to them), double-click for a word, Shift+click to extend. Ctrl+C copies when something is selected and
+  interrupts otherwise; Ctrl+V pastes. Right-click opens Copy / Paste / Select all. Ctrl+Shift+C/V and
+  Ctrl+Insert / Shift+Insert work too.
+- Keys: Ctrl+Shift+T machine list, Ctrl+Tab next tab, Ctrl+Shift+W close tab, Ctrl+= / Ctrl+- text size.
 
 Settings and keys are in `%APPDATA%\Whorl\whorl.dat`, encrypted with DPAPI for your Windows user;
 trusted host keys are in `%APPDATA%\Whorl\known_hosts`.

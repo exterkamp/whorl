@@ -178,7 +178,7 @@ private fun MachinesScreen(app: AppState) {
             }
         }
         Text(
-            "Whorl $appVersion · $appCommit   ·   Ctrl+Shift+T machines · Ctrl+Tab next tab · Ctrl+Shift+C/V copy/paste · Ctrl+= / Ctrl+- text size",
+            "Whorl $appVersion · $appCommit   ·   Ctrl+Shift+T machines · Ctrl+Tab next tab · Ctrl+C/V copy/paste · right-click for more · Ctrl+= / Ctrl+- text size",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 12.dp),
         )

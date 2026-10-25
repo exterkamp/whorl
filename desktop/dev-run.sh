@@ -51,6 +51,39 @@ docker run --rm --memory 6g --user "$(id -u):$(id -g)" \
     xdotool type --delay 40 "top -b -n1 | head -15"; xdotool key Return
     sleep 3
     import -window root /work/build/desktop-shots/3-top.png
+    # Copy and paste. Rows are 25px from the terminal top (73px into the window), columns 11px from 8px in.
+    W=$(xdotool search --name "^Whorl$" | head -1)
+    eval "$(xdotool getwindowgeometry --shell "$W")"
+    row() { echo $((Y + 73 + $1 * 25 + 12)); }
+    col() { echo $((X + 8 + $1 * 11 + 5)); }
+    CLIP=/work/build/desktop-shots/clipboard.txt; : > $CLIP
+    # 1. Drag across "hello from whorl desktop" (row 3), Ctrl+C.
+    xdotool mousemove $(col 0) $(row 3) mousedown 1 mousemove $(col 10) $(row 3) mousemove $(col 23) $(row 3) mouseup 1
+    sleep 1; import -window root /work/build/desktop-shots/5-selected.png
+    xdotool key ctrl+c; sleep 1
+    echo "1 drag + Ctrl+C: [$(xclip -o -selection clipboard 2>&1)]" >> $CLIP
+    # 2. Right-click menu.
+    xdotool mousemove $(col 30) $(row 8) click 3; sleep 1
+    import -window root /work/build/desktop-shots/6-menu.png
+    xdotool key Escape; sleep 1
+    # 3. With mouse reporting on (as herdr has it), a drag still selects; double-click selects a word.
+    xdotool type --delay 30 "printf \"\\e[?1000h\"; clear; echo mouse reporting on; echo alpha beta gamma"; xdotool key Return; sleep 1
+    import -window root /work/build/desktop-shots/7a-reporting.png
+    xdotool mousemove $(col 6) $(row 0) mousedown 1 mousemove $(col 9) $(row 0) mousemove $(col 15) $(row 0) mouseup 1; sleep 1
+    xdotool key ctrl+shift+c; sleep 1
+    echo "3 drag with mouse reporting on: [$(xclip -o -selection clipboard 2>&1)]" >> $CLIP
+    xdotool mousemove $(col 7) $(row 1) click --repeat 2 --delay 120 1; sleep 1
+    import -window root /work/build/desktop-shots/7-word.png
+    xdotool key ctrl+c; sleep 1
+    echo "3b double-click word: [$(xclip -o -selection clipboard 2>&1)]" >> $CLIP
+    xdotool type --delay 30 "printf \"\\e[?1000l\""; xdotool key Return; sleep 1
+    # 4. Ctrl+V pastes.
+    printf "echo pasted-from-clipboard" | xclip -selection clipboard
+    xdotool key ctrl+v; sleep 1; xdotool key Return; sleep 1
+    import -window root /work/build/desktop-shots/8-pasted.png
+    # 5. Ctrl+C with nothing selected still interrupts.
+    xdotool type --delay 30 "sleep 30"; xdotool key Return; sleep 1; xdotool key ctrl+c; sleep 1
+    import -window root /work/build/desktop-shots/9-interrupted.png
     xdotool key ctrl+shift+t
     sleep 2
     import -window root /work/build/desktop-shots/4-machines.png

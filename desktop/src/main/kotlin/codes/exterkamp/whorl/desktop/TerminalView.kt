@@ -1,6 +1,8 @@
 package codes.exterkamp.whorl.desktop
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ContextMenuArea
+import androidx.compose.foundation.ContextMenuItem
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -30,7 +32,6 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.ui.input.pointer.PointerEventType
-import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.isShiftPressed as isShiftHeld
 import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.layout.onSizeChanged
@@ -122,7 +123,29 @@ fun TerminalView(session: DesktopSession, fontSize: Int, modifier: Modifier = Mo
 
     fun paste() {
         val text = runCatching { Toolkit.getDefaultToolkit().systemClipboard.getData(DataFlavor.stringFlavor) as String }.getOrNull()
-        if (!text.isNullOrEmpty()) session.emulator?.paste(text)
+        if (!text.isNullOrEmpty()) {
+            scrollBack = 0
+            selection = null
+            session.emulator?.paste(text)
+        }
+    }
+
+    fun selectAll() {
+        val emulator = session.emulator ?: return
+        selection = Selection(0, -emulator.screen.activeTranscriptRows, emulator.mColumns - 1, emulator.mRows - 1)
+    }
+
+    /** The word (or path, URL…) under a cell: everything up to whitespace or brackets and quotes. */
+    fun selectWord(col: Int, row: Int) {
+        val emulator = session.emulator ?: return
+        val text = emulator.screen.getSelectedText(0, row, emulator.mColumns - 1, row)
+        val boundary = { c: Char -> c.isWhitespace() || c in "\"'`()[]{}<>|│" }
+        if (col >= text.length || boundary(text[col])) return
+        var a = col
+        while (a > 0 && !boundary(text[a - 1])) a--
+        var b = col
+        while (b + 1 < text.length && !boundary(text[b + 1])) b++
+        selection = Selection(a, row, b, row)
     }
 
     session.onClipboard = { Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(it), null) }
@@ -134,8 +157,19 @@ fun TerminalView(session: DesktopSession, fontSize: Int, modifier: Modifier = Mo
         onDispose { if (TypedInput.target === handler) TypedInput.target = null }
     }
 
-    var dragStart by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    // Mouse: dragging always selects text, even when a program (herdr, tmux, vim) has turned on mouse reporting;
+    // a click without a drag, and the wheel, go to that program. Double-click selects a word.
+    var pressAt by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    var dragging by remember { mutableStateOf(false) }
+    var lastClick by remember { mutableStateOf(0L to (-1 to -1)) }
 
+    ContextMenuArea(items = {
+        buildList {
+            if (selection != null) add(ContextMenuItem("Copy") { copySelection(); focus.requestFocus() })
+            add(ContextMenuItem("Paste") { paste(); focus.requestFocus() })
+            add(ContextMenuItem("Select all") { selectAll(); focus.requestFocus() })
+        }
+    }) {
     Canvas(
         modifier
             .fillMaxSize()
@@ -154,36 +188,48 @@ fun TerminalView(session: DesktopSession, fontSize: Int, modifier: Modifier = Mo
                 handleKey(event, keys, session, emulator, ::copySelection, ::paste) { scrollBack = 0; selection = null }
             }
             .onPointerEvent(PointerEventType.Press) { e ->
+                if (e.button != PointerButton.Primary) return@onPointerEvent // right-click is the context menu
                 focus.requestFocus()
                 val change = e.changes.first()
-                val (col, row) = cellAt(change.position.x, change.position.y)
-                val emulator = session.emulator ?: return@onPointerEvent
-                when {
-                    e.buttons.isSecondaryPressed -> {
-                        // Like Windows Terminal: right-click copies a selection, or pastes.
-                        if (!copySelection()) paste()
-                    }
-                    emulator.isMouseTrackingActive && !e.keyboardModifiers.isShiftHeld ->
-                        emulator.sendMouseEvent(TerminalEmulator.MOUSE_LEFT_BUTTON, col + 1, row + scrollBack + 1, true)
-                    else -> {
-                        dragStart = col to row
-                        selection = null
-                    }
+                val cell = cellAt(change.position.x, change.position.y)
+                val now = System.currentTimeMillis()
+                if (now - lastClick.first < 400 && lastClick.second == cell) {
+                    selectWord(cell.first, cell.second)
+                    lastClick = 0L to (-1 to -1)
+                    pressAt = null
+                    return@onPointerEvent
                 }
+                lastClick = now to cell
+                if (e.keyboardModifiers.isShiftHeld && selection != null) {
+                    // Shift+click extends the selection.
+                    val s = selection!!
+                    selection = Selection(s.startCol, s.startRow, cell.first, cell.second)
+                    pressAt = null
+                    return@onPointerEvent
+                }
+                selection = null
+                pressAt = cell
+                dragging = false
             }
             .onPointerEvent(PointerEventType.Move) { e ->
-                val start = dragStart ?: return@onPointerEvent
+                val start = pressAt ?: return@onPointerEvent
                 val change = e.changes.first()
-                val (col, row) = cellAt(change.position.x, change.position.y)
-                if (col to row != start || selection != null) selection = Selection(start.first, start.second, col, row)
+                val cell = cellAt(change.position.x, change.position.y)
+                if (cell != start || dragging) {
+                    dragging = true
+                    selection = Selection(start.first, start.second, cell.first, cell.second)
+                }
             }
             .onPointerEvent(PointerEventType.Release) { e ->
-                val emulator = session.emulator
-                if (dragStart == null && emulator != null && emulator.isMouseTrackingActive && e.button == PointerButton.Primary) {
-                    val (col, row) = cellAt(e.changes.first().position.x, e.changes.first().position.y)
-                    emulator.sendMouseEvent(TerminalEmulator.MOUSE_LEFT_BUTTON, col + 1, row + scrollBack + 1, false)
+                val start = pressAt
+                pressAt = null
+                if (start == null || dragging || e.button != PointerButton.Primary) return@onPointerEvent
+                // A plain click: to the program, if it's listening for the mouse.
+                val emulator = session.emulator ?: return@onPointerEvent
+                if (emulator.isMouseTrackingActive && scrollBack == 0) {
+                    emulator.sendMouseEvent(TerminalEmulator.MOUSE_LEFT_BUTTON, start.first + 1, start.second + 1, true)
+                    emulator.sendMouseEvent(TerminalEmulator.MOUSE_LEFT_BUTTON, start.first + 1, start.second + 1, false)
                 }
-                dragStart = null
             }
             .onPointerEvent(PointerEventType.Scroll) { e ->
                 val emulator = session.emulator ?: return@onPointerEvent
@@ -210,6 +256,7 @@ fun TerminalView(session: DesktopSession, fontSize: Int, modifier: Modifier = Mo
         drawIntoCanvas { canvas ->
             drawTerminal(canvas.nativeCanvas, emulator, metrics, scrollBack, selection, focused, size.first.toFloat(), size.second.toFloat())
         }
+    }
     }
 }
 
@@ -269,10 +316,13 @@ private fun handleKey(
     keys.swallowTyped = false
 
     // Clipboard: Ctrl+Shift+C / Ctrl+Shift+V; Ctrl+C copies only when there is a selection; Shift+Insert pastes.
+    // Windows conventions: Ctrl+C copies when there's a selection (otherwise it's ^C, interrupt), Ctrl+V pastes;
+    // Ctrl+Shift+C/V and Ctrl+Insert / Shift+Insert do the same.
     val shortcut = when {
         event.isCtrlPressed && event.isShiftPressed && event.key == Key.C -> { copy(); true }
-        event.isCtrlPressed && event.isShiftPressed && event.key == Key.V -> { paste(); true }
+        event.isCtrlPressed && event.key == Key.V && !event.isAltPressed -> { paste(); true }
         event.isCtrlPressed && !event.isShiftPressed && event.key == Key.C -> copy()
+        event.isCtrlPressed && event.key == Key.Insert -> { copy(); true }
         event.isShiftPressed && event.key == Key.Insert -> { paste(); true }
         else -> false
     }
@@ -348,7 +398,7 @@ private fun drawTerminal(
     val cursorRow = emulator.cursorRow
     val cursorCol = emulator.cursorCol
     val cursorVisible = emulator.shouldCursorBeVisible() && scrollBack == 0
-    val selectionColor = 0x664A90A0
+    val selectionColor = 0x8C3A8EE6.toInt() // a clear blue wash, like Windows Terminal's
 
     for (screenRow in 0 until emulator.mRows) {
         val row = screenRow - scrollBack
